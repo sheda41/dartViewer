@@ -3,445 +3,531 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>삼성전자 자기주식 취득 분석</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
+<title>Samsung Bonus</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: #060d1a;
-    color: #e2e8f0;
-    font-family: 'Noto Sans KR', sans-serif;
-    min-height: 100vh;
-    padding: 28px 18px;
-  }
-
-  /* 헤더 */
-  .header { text-align: center; margin-bottom: 32px; }
-  .badge {
-    display: inline-block; font-size: 10px; letter-spacing: 3px;
-    color: #00d4ff; border: 1px solid rgba(0,212,255,0.3);
-    background: rgba(0,212,255,0.06); border-radius: 3px;
-    padding: 3px 14px; margin-bottom: 14px; font-family: monospace;
-  }
-  .header h1 { font-size: clamp(20px,3.5vw,30px); font-weight: 900; color: #f8fafc; line-height: 1.2; }
-  .header p { font-size: 13px; color: #64748b; margin-top: 8px; }
-
-  /* KPI */
-  .kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 10px; margin-bottom: 24px;
-  }
-  .kpi-card {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 10px; padding: 14px 12px; text-align: center;
-  }
-  .kpi-val { font-size: clamp(18px,2.5vw,24px); font-weight: 900; font-family: monospace; }
-  .kpi-label { font-size: 11px; color: #64748b; margin-top: 4px; }
-
-  /* 차트 영역 */
-  .chart-card {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 12px; padding: 20px 16px; margin-bottom: 18px;
-  }
-  .section-title { font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 14px; letter-spacing: 1px; }
-
-  /* 바 차트 */
-  .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding-bottom: 4px; }
-  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-  .bar {
-    width: 100%; border-radius: 4px 4px 0 0;
-    cursor: pointer; transition: opacity 0.2s; position: relative;
-    min-width: 20px;
-  }
-  .bar:hover { opacity: 0.85; }
-  .bar-label { font-size: 9px; color: #64748b; font-family: monospace; text-align: center; }
-  .bar-val { font-size: 11px; color: #94a3b8; font-family: monospace; text-align: center; margin-bottom: 3px; }
-  .ref-line {
-    position: relative; width: 100%; height: 1px;
-    background: rgba(0,212,255,0.2); margin: 4px 0;
-  }
-  .bar-axis { display: flex; justify-content: space-between; padding: 0 4px; margin-top: 4px; }
-  .bar-axis span { font-size: 9px; color: #475569; font-family: monospace; }
-
-  /* 이벤트 카드 */
-  .events-label { font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 12px; letter-spacing: 1px; }
-  .event-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-    gap: 10px; margin-bottom: 20px;
-  }
-  .event-card {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 10px; padding: 14px 16px;
-    cursor: pointer; transition: all 0.2s;
-  }
-  .event-card:hover { border-color: #334155; background: #111827; }
-  .event-card.active { background: rgba(255,255,255,0.03); }
-
-  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
-  .card-date { font-size: 11px; color: #64748b; font-family: monospace; margin-bottom: 3px; }
-  .card-amt { font-size: 14px; font-weight: 800; color: #f1f5f9; }
-  .card-prog { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
-
-  .prog-badge {
-    font-size: 10px; font-weight: 700; padding: 2px 8px;
-    border-radius: 4px; letter-spacing: 1px;
-  }
-  .prog-badge.shareholder { background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.2); }
-  .prog-badge.employee { background: rgba(245,158,11,0.15); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); }
-
-  .ret-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; text-align: center; }
-  .ret-cell { }
-  .ret-period { font-size: 9px; color: #475569; margin-bottom: 3px; letter-spacing: 1px; }
-  .ret-val {
-    font-family: monospace; font-weight: 700; font-size: 13px;
-    padding: 2px 6px; border-radius: 5px; display: inline-block;
-  }
-  .ret-val.high { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
-  .ret-val.mid { background: rgba(134,239,172,0.1); color: #86efac; border: 1px solid rgba(134,239,172,0.15); }
-  .ret-val.low { background: rgba(148,163,184,0.08); color: #94a3b8; border: 1px solid rgba(148,163,184,0.1); }
-  .ret-val.neg { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.15); }
-  .ret-val.na { color: #475569; font-size: 12px; }
-
-  /* 상세 패널 */
-  .detail-panel {
-    border-radius: 14px; padding: 22px 18px;
-    margin-bottom: 20px;
-    animation: fadeIn 0.3s ease;
-  }
-  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; flex-wrap: wrap; gap: 10px; }
-  .detail-no { font-size: 11px; color: #64748b; font-family: monospace; }
-  .detail-title { font-size: 20px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
-  .detail-sub { font-size: 12px; margin-top: 4px; }
-  .close-btn {
-    background: transparent; border: 1px solid #1f2d3d; color: #64748b;
-    border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 12px;
-    font-family: 'Noto Sans KR', sans-serif;
-  }
-  .close-btn:hover { border-color: #334155; color: #94a3b8; }
-
-  .info-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 8px; margin-bottom: 18px;
-  }
-  .info-item {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 8px; padding: 10px 12px;
-  }
-  .info-key { font-size: 10px; color: #64748b; margin-bottom: 4px; letter-spacing: 1px; }
-  .info-val { font-size: 13px; color: #e2e8f0; font-family: monospace; }
-  .info-val.accent { font-weight: 800; }
-
-  .ret-big-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 18px; }
-  .ret-big {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 8px; padding: 12px 8px; text-align: center;
-  }
-  .ret-big.green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
-  .ret-big-label { font-size: 10px; color: #64748b; margin-bottom: 6px; letter-spacing: 1px; }
-  .ret-big-val { font-size: 22px; font-weight: 900; font-family: monospace; }
-
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media(max-width:560px){ .two-col { grid-template-columns: 1fr; } }
-  .detail-box { background: #080f1e; border: 1px solid #1f2d3d; border-radius: 8px; padding: 14px; }
-  .detail-box-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
-  .detail-item {
-    font-size: 12px; color: #94a3b8; line-height: 1.7;
-    padding-left: 10px; border-left: 2px solid #1f2d3d;
-    margin-bottom: 6px;
-  }
-
-  /* 인사이트 */
-  .insight-card {
-    background: #0d1520; border: 1px solid #1f2d3d;
-    border-radius: 12px; padding: 20px 16px;
-  }
-  .insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
-  .insight-item { border-radius: 8px; padding: 14px 12px; }
-  .insight-title { font-size: 13px; font-weight: 800; margin-bottom: 6px; }
-  .insight-text { font-size: 12px; color: #94a3b8; line-height: 1.7; }
-  .footnote { margin-top: 14px; font-size: 11px; color: #334155; font-family: monospace; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0b0e1a;color:#e2e8f0;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;padding:16px;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto}
+.hd{text-align:center;margin-bottom:18px}
+.hd-badge{display:inline-block;background:linear-gradient(90deg,#9333ea,#db2777);border-radius:99px;padding:4px 18px;font-size:11px;color:#fff;letter-spacing:1px;margin-bottom:10px}
+.hd h1{font-size:21px;font-weight:900;letter-spacing:-.5px}
+.warn-box{background:#1a0808;border:1px solid #7f1d1d;border-radius:10px;padding:10px 14px;font-size:12px;color:#fca5a5;text-align:center;line-height:1.6;margin-bottom:14px}
+.card{background:#141827;border-radius:14px;padding:16px;margin-bottom:12px}
+.card-ttl{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.hc-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.hc-lbl{font-size:12px;font-weight:700;margin-bottom:5px}
+.hc-box{display:flex;align-items:center;background:#0b0e1a;border:1px solid #1e293b;border-radius:8px;padding:7px 9px}
+.hc-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:15px;font-weight:700;text-align:right;outline:none;font-family:inherit;width:0}
+.hc-u{color:#64748b;font-size:12px;margin-left:3px;flex-shrink:0}
+.hc-sum{text-align:right;font-size:12px;color:#64748b}
+.hc-sum b{color:#f1f5f9}
+.yr-wrap{position:relative;margin-bottom:12px}
+.yr-lbl{font-size:11px;color:#64748b;margin-bottom:5px}
+.yr-sel{width:100%;background:#0b0e1a;border:2px solid #b45309;border-radius:10px;color:#fbbf24;font-size:13px;font-weight:700;padding:11px 14px;outline:none;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none}
+.yr-arrow{position:absolute;right:13px;top:50%;transform:translateY(50%);color:#fbbf24;pointer-events:none;font-size:12px}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pf label{display:block;font-size:11px;color:#64748b;margin-bottom:4px}
+.pf-box{display:flex;align-items:center;background:#0b0e1a;border:1px solid #1e293b;border-radius:8px;padding:7px 9px}
+.pf-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:14px;font-weight:700;text-align:right;outline:none;font-family:inherit;min-width:0}
+.pf-u{color:#64748b;font-size:12px;margin-left:3px;flex-shrink:0}
+.pf-u2{color:#64748b;font-size:12px;margin-right:3px;flex-shrink:0}
+.opi-card{background:#0a1a0f;border:1px solid #166534;border-radius:13px;padding:14px;margin-bottom:12px}
+.opi-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.opi-ttl{font-size:15px;font-weight:800}
+.opi-badge{background:#14532d;border:1px solid #16a34a;border-radius:99px;padding:2px 10px;font-size:11px;color:#4ade80}
+.opi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.oi label{display:block;font-size:11px;color:#64748b;margin-bottom:3px}
+.oi .v{font-size:19px;font-weight:800}
+.vg{color:#4ade80}.vr{color:#f87171}.vw{color:#f1f5f9}
+.op-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;overflow:hidden}
+.op-box{border-radius:10px;padding:10px;min-width:0;overflow:hidden}
+.op-mem{background:#0b0e1a;border:1px solid #38bdf844}
+.op-fnd{background:#0b0e1a;border:1px solid #f472b644}
+.op-name{font-size:12px;font-weight:700;margin-bottom:8px;word-break:keep-all}
+.op-in-row{display:flex;align-items:center;background:#141827;border-radius:7px;padding:7px 10px}
+.op-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:14px;font-weight:700;text-align:right;outline:none;font-family:inherit;min-width:0;width:0}
+.op-u{color:#64748b;font-size:13px;margin-left:4px}
+.op-contrib{font-size:11px;color:#64748b;margin-top:5px}
+.op-note{background:#0b0e1a;border-radius:8px;padding:9px 11px;font-size:11px;color:#64748b;line-height:1.7;margin-bottom:12px}
+.sl-row{margin-bottom:14px}
+.sl-hdr{display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px}
+.sl-nm{color:#94a3b8}
+.sl-v{font-weight:700}
+.track{position:relative;height:8px;border-radius:4px;background:#1e293b}
+.fill{position:absolute;left:0;top:0;height:100%;border-radius:4px;pointer-events:none}
+.track input[type=range]{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer;margin:0;height:100%}
+.hurdle{border-radius:9px;padding:11px 14px;font-size:13px;font-weight:700;text-align:center;margin-top:4px}
+.h-ok{background:#052e16;border:1px solid #16a34a;color:#4ade80}
+.h-fail{background:#2a0a0a;border:1px solid #dc2626;color:#f87171}
+.div-card{border-radius:13px;padding:15px;margin-bottom:10px}
+.dc-mem{background:#0d1929;border-top:2px solid #38bdf8}
+.dc-com{background:#1a1a08;border-top:2px solid #facc15}
+.dc-fnd{background:#1c0d1c;border-top:2px solid #f472b6}
+.dc-name{text-align:center;font-size:16px;font-weight:800;margin-bottom:11px}
+.dc-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.dc-lbl{color:#94a3b8}
+.dc-purple{color:#a78bfa;font-weight:700}
+.dc-white{color:#f1f5f9}
+.dc-red{color:#f87171;font-weight:700}
+.stk-box{background:#0b0e1a;border-radius:9px;padding:13px;margin-top:10px}
+.stk-lbl{text-align:center;font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:3px}
+.stk-num{text-align:center;font-size:28px;font-weight:900;color:#38bdf8}
+.stk-sub{text-align:center;font-size:11px;color:#64748b;margin-bottom:11px}
+.stk-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.stk-t{background:#141827;border-radius:7px;padding:9px;text-align:center}
+.stk-t.on{background:#1a2a3e;border:1px solid #38bdf844}
+.st-lbl{font-size:10px;color:#64748b;margin-bottom:3px}
+.st-n{font-size:17px;font-weight:800;color:#38bdf8}
+.st-w{font-size:10px;color:#64748b;margin-top:2px}
+.pkg-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pkg-c{background:#1a1f30;border-radius:11px;padding:11px 8px;text-align:center}
+.pkg-nm{font-size:11px;font-weight:700;margin-bottom:6px}
+.pkg-tot{font-size:16px;font-weight:900;margin-bottom:5px}
+.pkg-sub{font-size:10px;color:#94a3b8;line-height:1.6;white-space:pre-line}
+.guide{background:#10131f;border:1px solid #1e293b;border-radius:13px;padding:15px;margin-bottom:10px}
+.g-ttl{text-align:center;font-size:14px;font-weight:800;margin-bottom:14px}
+.g-step{margin-bottom:15px;padding-bottom:15px;border-bottom:1px solid #1e293b}
+.g-step:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.g-num{font-size:13px;font-weight:700;margin-bottom:5px}
+.g-form{font-size:11px;color:#94a3b8;margin-bottom:6px;line-height:1.6}
+.g-calc{background:#0b0e1a;border-radius:7px;padding:8px 11px;font-size:12px;line-height:1.7}
+.g-rows{display:flex;flex-direction:column;gap:4px}
+.g-row{background:#0b0e1a;border-radius:6px;padding:6px 10px;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.hi{color:#a78bfa;font-weight:700}
+.footer{text-align:center;color:#334155;font-size:11px;margin-top:16px;padding-bottom:20px}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<!-- 헤더 -->
-<div class="header">
-  <div class="badge">KRX 005930 · DART 공시 원문 기반</div>
-  <h1>삼성전자 자기주식 취득 분석</h1>
-  <p>3조원 이상 취득 이벤트 6건 · 2015~2026</p>
+<div class="hd">
+  <div class="hd-badge">성과급 — 시뮬레이터 Pro</div>
+  <h1>SAMSUNG 성과급 시뮬레이터</h1>
 </div>
+<div class="warn-box">⚠️ 본 시뮬레이터는 단순 참고용이며, 공식적인 기준과 차이가 있을 수<br>있습니다. 실제 수령액과 다를 수 있습니다.</div>
 
-<!-- KPI -->
-<div class="kpi-grid">
-  <div class="kpi-card"><div class="kpi-val" style="color:#00d4ff">6건</div><div class="kpi-label">분석 대상</div></div>
-  <div class="kpi-card"><div class="kpi-val" style="color:#10B981">43.1조</div><div class="kpi-label">총 취득금액</div></div>
-  <div class="kpi-card"><div class="kpi-val" style="color:#F59E0B">+6.3%</div><div class="kpi-label">평균 1개월 수익률</div></div>
-  <div class="kpi-card"><div class="kpi-val" style="color:#a78bfa">+56.8%</div><div class="kpi-label">최고 12개월 수익률</div></div>
-  <div class="kpi-card"><div class="kpi-val" style="color:#f87171">7.17조</div><div class="kpi-label">최대 단일 공시</div></div>
-</div>
-
-<!-- 바 차트 -->
-<div class="chart-card">
-  <div class="section-title">📊 공시별 취득금액 (조원) — 점선: 3조 기준</div>
-  <div id="barChart" class="bar-chart"></div>
-</div>
-
-<!-- 이벤트 카드 -->
-<div class="events-label">🗂 이벤트별 클릭 → 상세 분석</div>
-<div class="event-grid" id="eventGrid"></div>
-
-<!-- 상세 패널 -->
-<div id="detailPanel" style="display:none"></div>
-
-<!-- 인사이트 -->
-<div class="insight-card">
-  <div class="section-title">💡 종합 인사이트</div>
-  <div class="insight-grid">
-    <div class="insight-item" style="background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.15)">
-      <div class="insight-title" style="color:#00d4ff">⚡ 단기 효과</div>
-      <div class="insight-text">6건 평균 1개월 수익률 +6.3%. 3조↑ 공시는 예외 없이 당일 주가 급등 유발</div>
+<!-- 인원 설정 -->
+<div class="card">
+  <div class="card-ttl">👥 사업부별 인원 설정</div>
+  <div class="hc-row">
+    <div>
+      <div class="hc-lbl" style="color:#38bdf8">메모리</div>
+      <div class="hc-box"><input class="hc-in" id="hcM" type="number" value="27000" oninput="go()"><span class="hc-u">명</span></div>
     </div>
-    <div class="insight-item" style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15)">
-      <div class="insight-title" style="color:#10B981">📈 업황 연동</div>
-      <div class="insight-text">12개월 수익률은 자사주보다 반도체 업황 사이클이 결정적. 슈퍼사이클 시 효과 극대화</div>
+    <div>
+      <div class="hc-lbl" style="color:#f472b6">Foundry/S.LSI</div>
+      <div class="hc-box"><input class="hc-in" id="hcF" type="number" value="23000" oninput="go()"><span class="hc-u">명</span></div>
     </div>
-    <div class="insight-item" style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)">
-      <div class="insight-title" style="color:#F59E0B">🔄 구조적 전환</div>
-      <div class="insight-text">2026년부터 임직원보상형 자사주 등장. 소각 목적을 넘어 성과 연동 인센티브로 진화</div>
-    </div>
-    <div class="insight-item" style="background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.15)">
-      <div class="insight-title" style="color:#a78bfa">🛡 하방 지지</div>
-      <div class="insight-text">모든 이벤트에서 대규모 자사주 수요가 강력한 하방지지 역할 수행 확인</div>
+    <div>
+      <div class="hc-lbl" style="color:#facc15">공통조직</div>
+      <div class="hc-box"><input class="hc-in" id="hcC" type="number" value="28000" oninput="go()"><span class="hc-u">명</span></div>
     </div>
   </div>
-  <div class="footnote">※ 데이터 출처: DART 공시정보 활용마당 (자기주식취득결정) · 주가 변동률은 수정주가(%) 기준</div>
+  <div class="hc-sum">💡 합계 총 인원: <b id="hcTot">78,000</b>명</div>
+</div>
+
+<!-- 개인·공통 설정 -->
+<div class="card">
+  <div class="card-ttl">🧑 개인 · 공통 설정</div>
+  <div class="yr-lbl">📌 적용 연도 (허들 및 페널티 자동 연동)</div>
+  <div class="yr-wrap">
+    <select class="yr-sel" id="yrSel" onchange="go()">
+      <option value="2026">2026년 (허들 200조 / 적자 페널티 미적용)</option>
+      <option value="2027">2027년 (허들 200조 / 적자 페널티 적용)</option>
+      <option value="2028">2028년 (허들 200조 / 적자 페널티 적용)</option>
+      <option value="2029">2029년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2030">2030년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2031">2031년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2032">2032년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2033">2033년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2034">2034년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2035">2035년 (허들 100조 / 적자 페널티 적용)</option>
+    </select>
+    <span class="yr-arrow">▼</span>
+  </div>
+  <div class="pg">
+    <div class="pf"><label>내 계약 연봉</label><div class="pf-box"><input class="pf-in" id="myS" type="number" value="5500" oninput="go()"><span class="pf-u">만원</span></div></div>
+    <div class="pf"><label>근무 개월 수</label><div class="pf-box"><input class="pf-in" id="mon" type="number" value="12" min="1" max="12" oninput="go()"><span class="pf-u">개월</span></div></div>
+    <div class="pf"><label>회사 평균 연봉</label><div class="pf-box"><input class="pf-in" id="avgS" type="number" value="8000" oninput="go()"><span class="pf-u">만원</span></div></div>
+    <div class="pf"><label>자사주 기준가</label><div class="pf-box"><span class="pf-u2">₩</span><input class="pf-in" id="spx" type="number" value="290000" oninput="go()"><span class="pf-u">₩</span></div></div>
+    <div class="pf" style="grid-column:1/3"><label>통합 실효세율</label><div class="pf-box"><input class="pf-in" id="tax" type="number" value="36" oninput="go()"><span class="pf-u">%</span></div></div>
+  </div>
+</div>
+
+<!-- OPI -->
+<div class="opi-card">
+  <div class="opi-hdr">
+    <span style="font-size:18px">💵</span>
+    <span class="opi-ttl">OPI (성과인센티브)</span>
+    <span class="opi-badge">재원 OP × 10%</span>
+  </div>
+  <div class="opi-grid">
+    <div class="oi"><label>지급률(상한50%)</label><div class="v vg" id="oRate">-</div></div>
+    <div class="oi"><label>세전(개월비례)</label><div class="v vw" id="oPre">-</div></div>
+    <div class="oi"><label>세금제외</label><div class="v vr" id="oTax">-</div></div>
+    <div class="oi"><label>세후 실수령</label><div class="v vg" id="oAft">-</div></div>
+  </div>
+</div>
+
+<!-- 특별경영성과급 -->
+<div class="card">
+  <div class="card-ttl">📈 특별경영성과급 시뮬레이션</div>
+  <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">▸ 사업부별 DS 영업이익 직접 입력</div>
+  <div class="op-grid">
+    <div class="op-box op-mem">
+      <div class="op-name" style="color:#38bdf8">💾 메모리 사업부</div>
+      <div class="op-in-row"><input class="op-in" id="opM" type="number" value="280" oninput="go()"><span class="op-u">조</span></div>
+      <div class="op-contrib">OP 기여 비중: <b id="mCon" style="color:#38bdf8">100.0%</b></div>
+    </div>
+    <div class="op-box op-fnd">
+      <div class="op-name" style="color:#f472b6">🏭 Foundry/S.LSI 사업부</div>
+      <div class="op-in-row"><input class="op-in" id="opF" type="number" value="0" oninput="go()"><span class="op-u">조</span></div>
+      <div class="op-contrib">OP 기여 비중: <b id="fCon" style="color:#f472b6">0.0%</b></div>
+    </div>
+  </div>
+  <div class="op-note">
+    💡 <b style="color:#e2e8f0">DS 전체 영업이익(OP)</b> = 메모리 + Foundry/S.LSI 합산 (적자 시 음수 반영)<br>
+    ※ 공통 조직은 배분 대상에 포함되나 독자적인 OP는 산정하지 않습니다.<br>
+    ※ <b style="color:#e2e8f0">특별경영성과급 재원</b> = 흑자 달성 시(전체 OP &gt; 0) 전체 OP × 재원 확보 비율
+  </div>
+  <div class="sl-row">
+    <div class="sl-hdr"><span class="sl-nm">재원 확보 비율 (DS OP 대비)</span><span class="sl-v" id="poolV" style="color:#a78bfa">10.5%</span></div>
+    <div class="track">
+      <div class="fill" id="poolFill" style="background:#a78bfa"></div>
+      <input type="range" id="poolR" min="0" max="50" step="0.5" value="10.5" oninput="go()">
+    </div>
+  </div>
+  <div class="sl-row">
+    <div class="sl-hdr"><span class="sl-nm">부문 : 사업부 배분 비율</span><span class="sl-v" id="ratV" style="color:#facc15">40 : 60</span></div>
+    <div class="track">
+      <div class="fill" id="ratFill" style="background:#facc15"></div>
+      <input type="range" id="ratR" min="0" max="10" step="1" value="4" oninput="go()">
+    </div>
+  </div>
+  <div class="hurdle h-ok" id="hurdleBox">✅ 허들(200조) 달성 — DS OP 280조</div>
+</div>
+
+<!-- 사업부별 자사주 명세 -->
+<div class="card">
+  <div class="card-ttl">📊 사업부별 자사주 지급 명세</div>
+  <div class="div-card dc-mem">
+    <div class="dc-name" style="color:#38bdf8">메모리</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="mRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="mPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl1">36</span>%)</span><span class="dc-red" id="mTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="mSh">-</div>
+      <div class="stk-sub" id="mShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="mS0">-</div><div class="st-w" id="mS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="mS1">-</div><div class="st-w" id="mS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="mS2">-</div><div class="st-w" id="mS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="div-card dc-com">
+    <div class="dc-name" style="color:#facc15">공통</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="cRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="cPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl2">36</span>%)</span><span class="dc-red" id="cTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="cSh">-</div>
+      <div class="stk-sub" id="cShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="cS0">-</div><div class="st-w" id="cS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="cS1">-</div><div class="st-w" id="cS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="cS2">-</div><div class="st-w" id="cS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="div-card dc-fnd">
+    <div class="dc-name" style="color:#f472b6">Foundry/S.LSI</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="fRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="fPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl3">36</span>%)</span><span class="dc-red" id="fTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="fSh">-</div>
+      <div class="stk-sub" id="fShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="fS0">-</div><div class="st-w" id="fS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="fS1">-</div><div class="st-w" id="fS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="fS2">-</div><div class="st-w" id="fS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 최종 수령 패키지 -->
+<div class="card">
+  <div class="card-ttl">🎯 최종 수령 패키지 (세후)</div>
+  <div class="pkg-grid">
+    <div class="pkg-c" style="border-top:2px solid #38bdf8">
+      <div class="pkg-nm" style="color:#38bdf8">메모리 총합</div>
+      <div class="pkg-tot" id="pkM" style="color:#38bdf8">-</div>
+      <div class="pkg-sub" id="pkMs">-</div>
+    </div>
+    <div class="pkg-c" style="border-top:2px solid #facc15">
+      <div class="pkg-nm" style="color:#facc15">공통 총합</div>
+      <div class="pkg-tot" id="pkC" style="color:#facc15">-</div>
+      <div class="pkg-sub" id="pkCs">-</div>
+    </div>
+    <div class="pkg-c" style="border-top:2px solid #f472b6">
+      <div class="pkg-nm" style="color:#f472b6">Foundry/S.LSI 총합</div>
+      <div class="pkg-tot" id="pkF" style="color:#f472b6">-</div>
+      <div class="pkg-sub" id="pkFs">-</div>
+    </div>
+  </div>
+</div>
+
+<!-- 산식 가이드 OPI -->
+<div class="guide">
+  <div class="g-ttl">💵 OPI 산출 과정</div>
+  <div class="g-step">
+    <div class="g-num">① 전체 OPI 재원</div>
+    <div class="g-form">💡 공식: DS 전체 영업이익(양수) × 10%</div>
+    <div class="g-calc" id="g1">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">② 1인당 배분액</div>
+    <div class="g-form">💡 공식: 전체 OPI 재원 ÷ 총 인원수</div>
+    <div class="g-calc" id="g2">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">③ OPI 지급률 <span style="color:#64748b;font-size:11px">(최대 상한선 50%)</span></div>
+    <div class="g-form">💡 공식: 1인당 배분액 ÷ 회사 평균 연봉</div>
+    <div class="g-calc" id="g3">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">④ 내 OPI (세전)</div>
+    <div class="g-form">💡 공식: 내 연봉 × OPI 지급률 × (근무개월수 ÷ 12)</div>
+    <div class="g-calc" id="g4">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑤ 세후 실수령액</div>
+    <div class="g-form">💡 공식: 세전 금액 × (1 - 실효세율)</div>
+    <div class="g-calc" id="g5">-</div>
+  </div>
+</div>
+
+<!-- 산식 가이드 특별 -->
+<div class="guide">
+  <div class="g-ttl">📈 특별경영성과급 산출 과정</div>
+  <div class="g-step">
+    <div class="g-num">① 전체 확보 재원</div>
+    <div class="g-form">💡 공식: DS 전체 영업이익(적자 시 0원) × 재원 확보 비율</div>
+    <div class="g-calc" id="s1">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">② 부문(공통) 지급률</div>
+    <div class="g-form">💡 공식: 부문 배분 재원(전체의 40%) ÷ (부문 가중인원 × 평균연봉)<br>※ 부문 가중인원 = (메모리×1.0) + (공통×1.0) + (Foundry/S.LSI×1.0)</div>
+    <div class="g-calc" id="s2">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">③ 사업부 기초 지급률 <span style="color:#64748b;font-size:11px">(가장 중요!)</span></div>
+    <div class="g-form">💡 공식: 사업부 배분 재원(전체의 60%) ÷ (사업부 가중인원 × 평균연봉)<br>※ 사업부 가중인원 = (메모리×1.0) + (공통×0.7) + (Foundry/S.LSI×자체영익비율)</div>
+    <div class="g-calc" id="s3">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">④ 사업부별 가중치 적용 지급률</div>
+    <div class="g-form">💡 공식: ③에서 구한 사업부 기초 지급률 × 각 사업부 가중치</div>
+    <div class="g-rows" id="s4"></div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑤ 최종 합산 지급률</div>
+    <div class="g-form">💡 공식: ② 부문 지급률 + ④ 사업부 가중치 적용 지급률</div>
+    <div class="g-rows" id="s5"></div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑥ 내 자사주 수량 도출</div>
+    <div class="g-form">💡 공식: [내 연봉 × 최종 지급률 × 세금제외 × 근무비율] ÷ 자사주 기준가</div>
+    <div class="g-rows" id="s6"></div>
+  </div>
+</div>
+
+<div class="footer">* 실제 성과급과 다를 수 있습니다. 참고용으로만 사용하세요.</div>
 </div>
 
 <script>
-const EVENTS = [
-  {
-    no:1, date:"2015-10-29", program:"1차 프로그램",
-    tag:"주주가치 제고 / 소각", type:"shareholder",
-    ordAmt:29168, prefAmt:12673, total:41841, totalTr:"4.18조",
-    purpose:"전량 소각", period:"2015.10.30 ~ 2016.01.29",
-    priceRef:"1,220,000원 (액면분할 전)",
-    ret:{m1:3.3, m3:8.2, m6:13.5, m12:13.7},
-    color:"#3B82F6",
-    bg:["엘리엇 어드바이저스, 삼성물산 합병 반대 의결권 행사(2015.07) — 지배구조 압박","삼성전자 PBR 약 1.0배, 시장 대비 저평가 인식 확산","시가총액 대비 6.0% — 국내 기업 역대 최대 규모","이사회 '주가가 회사 가치 대비 과도하게 저평가' 판단"],
-    result:["공시 당일 +3.3% 급등, 시장 즉각 반응","D램·낸드 업사이클 진입과 맞물려 12개월 +13.7%","자사주 소각으로 EPS·BPS 개선 효과 실현","2016.11 개선된 주주환원 정책 후속 발표"]
-  },
-  {
-    no:2, date:"2024-11-18", program:"3차 프로그램 1차분",
-    tag:"주주가치 제고 / 소각", type:"shareholder",
-    ordAmt:26827, prefAmt:3173, total:30000, totalTr:"3.00조",
-    purpose:"전량 소각 완료", period:"2024.11.18 ~ 2025.02.17",
-    priceRef:"53,500원",
-    ret:{m1:5.2, m3:21.5, m6:34.6, m12:56.8},
-    color:"#10B981",
-    bg:["주가 49,900원 — 4년 5개월 만의 4만원대 붕괴","HBM 기술 격차, 파운드리 수율 문제 지속","트럼프 2기 관세 우려로 외국인 대규모 이탈","PBR 0.83배 — 역사적 최하단 저평가 영역"],
-    result:["발표 당일(11.15) +7.21% 급등, 5만원대 즉시 회복","3개월 +21.5%, D램 가격 회복 기대감 반영","소각 완료(2025.02.20) 후 EPS 개선 가시화","12개월 +56.8% — 반도체 슈퍼사이클 복귀 효과"]
-  },
-  {
-    no:3, date:"2025-02-18", program:"3차 프로그램 2차분",
-    tag:"주주가치 제고 / 임직원보상", type:"shareholder",
-    ordAmt:26964, prefAmt:3036, total:30000, totalTr:"3.00조",
-    purpose:"소각 + 임직원보상", period:"2025.02.19 ~ 2025.05.16",
-    priceRef:"약 56,600원",
-    ret:{m1:2.5, m3:9.5, m6:23.7, m12:48.2},
-    color:"#10B981",
-    bg:["1차분(3조) 소각 완료 당일 즉시 2차분 결의","임직원 주식보상 프로그램(OPI·LTI) 도입 병행","HBM3E 엔비디아 납품 본격화 기대감","연간 9.8조원 정규배당과 병행하는 이중 주주환원"],
-    result:["1차 소각·2차 매입 동시 발표로 주가 연속성 신호","3개월 +9.5%, 6개월 +23.7% 상승 지속","임직원 주식보상 연동 — 경영진-주주 이해관계 정렬","2025년 자기주식 매입액 81,893억원 (전년比 4.5배)"]
-  },
-  {
-    no:4, date:"2025-07-08", program:"3차 프로그램 3차분",
-    tag:"주주가치 제고 / 임직원보상", type:"shareholder",
-    ordAmt:35100, prefAmt:4019, total:39119, totalTr:"3.91조",
-    purpose:"소각 8.4조 확정", period:"2025.07.09 ~ 2025.10.08",
-    priceRef:"61,700원",
-    ret:{m1:5.3, m3:21.6, m6:36.0, m12:null},
-    color:"#10B981",
-    bg:["10조원 계획 최종분 — 당초보다 1개월 이상 앞당겨 완료","D램·낸드 가격 동반 상승 슈퍼사이클 본격화","HBM3E 공급 확대, 外人 지분율 51% 회복","3분기 영업이익 컨센서스 10조원 돌파"],
-    result:["매입 완료 시점 종가 83,900원 — 발표일 대비 +68.1%","3개월 +21.6%, 6개월 +36.0%","소각 8.4조 확정 → 발행주식수 대폭 감소","외인 지분 51% 회복 — 주주환원 신뢰 확인"]
-  },
-  {
-    no:5, date:"2026-01-29", program:"임직원 보상 프로그램",
-    tag:"임직원 주식보상", type:"employee",
-    ordAmt:35728, prefAmt:0, total:35728, totalTr:"3.57조",
-    purpose:"DS부문 특별성과급", period:"2026.01.30 ~ 2026.04.29",
-    priceRef:"약 162,700원",
-    ret:{m1:7.6, m3:35.5, m6:null, m12:null},
-    color:"#F59E0B",
-    bg:["DS부문 특별경영성과급 향후 10년 전액 자사주 지급 합의","성과·주가를 임직원 인센티브에 직접 연동","2026년 삼성전자 시총 1,000조원 돌파 분위기","AI 반도체 수요 폭증 — HBM4·GDDR7 공급 확대"],
-    result:["1개월 +7.6%, 3개월 +35.5% (4월 말 22만원대)","대규모 자사주 수요가 강력한 하방지지 역할","시장: 임직원보상 목적이지만 추가 주주환원으로 해석","DS부문 성과급 구조 개편 → 장기 성과 동기부여"]
-  },
-  {
-    no:6, date:"2026-03-18", program:"임직원 보상 프로그램",
-    tag:"임직원 주식보상 (진행중)", type:"employee",
-    ordAmt:71743, prefAmt:0, total:71743, totalTr:"7.17조",
-    purpose:"DS부문 특별성과급 추가", period:"2026.03.19 ~ 2026.06.18",
-    priceRef:"193,900원",
-    ret:{m1:13.7, m3:null, m6:null, m12:null},
-    color:"#F59E0B",
-    bg:["단일 공시 역대 최대 — 종전 최대(2015년 4.18조)의 1.7배","삼성전자 노사 총파업 합의(2026.05.21) 맥락","DS부문 임직원 1인당 성과급 최대 6억원 추산","매일 8.6백만주 한도, 3개월 집중 매입"],
-    result:["1개월(4월 말) 종가 220,500원 — +13.7% 상승","현재 진행 중 (~2026.06.18)","완료 후 소각 예정 — 2026년 총 취득액 약 13.2조","역대 최대 임직원보상형 자사주 — 새 패러다임"]
-  }
-];
+// 단위: 만원
+// 1조 = 10^12원 = 10^8 만원
+const JO = 100000000;
+const $ = id => document.getElementById(id);
+const F = n => Math.round(n).toLocaleString();
+const P = n => n.toFixed(1) + '%';
 
-let selectedIdx = null;
+function go() {
+  // 입력값
+  const hcM = +$('hcM').value || 0;
+  const hcF = +$('hcF').value || 0;
+  const hcC = +$('hcC').value || 0;
+  const tot = hcM + hcF + hcC;
+  $('hcTot').textContent = tot.toLocaleString();
 
-// ── 수익률 배지 ──────────────────────────────────────────
-function retBadgeHTML(val, big=false) {
-  if (val === null) return `<span class="ret-val na">—</span>`;
-  const cls = val >= 20 ? "high" : val >= 5 ? "mid" : val < 0 ? "neg" : "low";
-  const txt = (val > 0 ? "+" : "") + val + "%";
-  if (big) {
-    const color = val >= 20 ? "#22c55e" : val >= 5 ? "#86efac" : val < 0 ? "#ef4444" : "#94a3b8";
-    const bg = val >= 20 ? "rgba(34,197,94,0.08)" : "rgba(148,163,184,0.05)";
-    const border = val >= 20 ? "rgba(34,197,94,0.25)" : "#1f2d3d";
-    return `<div class="ret-big ${val>=20?'green':''}" style="background:${bg};border-color:${border}">
-      <div class="ret-big-label">${arguments[2]}</div>
-      <div class="ret-big-val" style="color:${color}">${txt}</div>
-    </div>`;
-  }
-  return `<span class="ret-val ${cls}">${txt}</span>`;
-}
+  const yr    = +$('yrSel').value;
+  const myS   = +$('myS').value  || 0;   // 만원
+  const mon   = Math.min(12, Math.max(1, +$('mon').value || 12));
+  const avgS  = +$('avgS').value || 1;   // 만원
+  const spx원  = +$('spx').value  || 1;   // 원
+  const spx만  = spx원 / 10000;           // 만원
+  const taxP  = +$('tax').value  || 0;
+  const tr    = taxP / 100;
+  const opM   = +$('opM').value  || 0;   // 조
+  const opF   = +$('opF').value  || 0;   // 조
+  const dsOP  = opM + opF;               // 조
 
-// ── 바 차트 렌더링 ────────────────────────────────────────
-function renderBar() {
-  const maxVal = Math.max(...EVENTS.map(e => e.total));
-  const refPct = 30000 / maxVal * 100;
-  const container = document.getElementById('barChart');
-  container.innerHTML = EVENTS.map((e, i) => {
-    const pct = e.total / maxVal * 100;
-    const eok = Math.round(e.total / 1000) / 10;
-    const opacity = selectedIdx === null || selectedIdx === i ? 1 : 0.4;
-    return `
-      <div class="bar-wrap" onclick="selectEvent(${i})">
-        <div class="bar-val">${eok}조</div>
-        <div class="bar" style="height:${pct}%;background:${e.color};opacity:${opacity};position:relative;">
-          ${pct > refPct ? '' : ''}
-        </div>
-        <div class="bar-label">${e.date.slice(0,7)}</div>
-      </div>`;
-  }).join('');
+  // OP 기여 비중
+  const posM = Math.max(0, opM);
+  const posF = Math.max(0, opF);
+  const posT = posM + posF;
+  $('mCon').textContent = posT > 0 ? P(posM / posT * 100) : '0.0%';
+  $('fCon').textContent = posT > 0 ? P(posF / posT * 100) : '0.0%';
 
-  // 3조 기준선 표시 (텍스트)
-  container.insertAdjacentHTML('beforeend',
-    `<div style="position:absolute;right:8px;top:${100-refPct}%;font-size:9px;color:rgba(0,212,255,0.5);font-family:monospace;transform:translateY(-50%)">3조↑</div>`);
-  container.style.position = 'relative';
-}
+  // 세율 라벨
+  ['tl1','tl2','tl3'].forEach(id => $(id).textContent = taxP);
 
-// ── 이벤트 카드 렌더링 ───────────────────────────────────
-function renderCards() {
-  const grid = document.getElementById('eventGrid');
-  grid.innerHTML = EVENTS.map((e, i) => {
-    const isActive = selectedIdx === i;
-    const borderColor = isActive ? e.color : '#1f2d3d';
-    const bg = isActive ? `${e.color}10` : '#0d1520';
-    return `
-      <div class="event-card ${isActive?'active':''}"
-        style="border-color:${borderColor};background:${bg};"
-        onclick="selectEvent(${i})">
-        <div class="card-top">
-          <div>
-            <div class="card-date">${e.date}</div>
-            <div class="card-amt">${e.totalTr}</div>
-          </div>
-          <span class="prog-badge ${e.type}">${e.type==='employee'?'임직원보상':'주주가치제고'}</span>
-        </div>
-        <div class="card-prog" style="color:${e.color}">${e.program}</div>
-        <div class="ret-grid">
-          ${[['1M',e.ret.m1],['3M',e.ret.m3],['6M',e.ret.m6],['12M',e.ret.m12]].map(([lbl,val])=>`
-            <div class="ret-cell">
-              <div class="ret-period">${lbl}</div>
-              ${retBadgeHTML(val)}
-            </div>`).join('')}
-        </div>
-      </div>`;
-  }).join('');
-}
+  // 슬라이더
+  const poolPct = +$('poolR').value;
+  $('poolV').textContent = poolPct.toFixed(1) + '%';
+  $('poolFill').style.width = (poolPct / 50 * 100) + '%';
 
-// ── 상세 패널 렌더링 ─────────────────────────────────────
-function renderDetail(i) {
-  const e = EVENTS[i];
-  const panel = document.getElementById('detailPanel');
-  panel.style.display = 'block';
-  panel.style.background = `${e.color}08`;
-  panel.style.border = `1px solid ${e.color}44`;
-  panel.className = 'detail-panel';
+  const ratN = +$('ratR').value;  // 0~10 (부문 비율)
+  $('ratV').textContent = (ratN * 10) + ' : ' + ((10 - ratN) * 10);
+  $('ratFill').style.width = (ratN / 10 * 100) + '%';
+  const bShare   = ratN / 10;      // 부문 비율
+  const bizShare = 1 - bShare;     // 사업부 비율
 
-  panel.innerHTML = `
-    <div class="detail-header">
-      <div>
-        <div class="detail-no">이벤트 ${e.no} · ${e.date}</div>
-        <div class="detail-title">${e.program}</div>
-        <div class="detail-sub" style="color:${e.color}">${e.tag}</div>
-      </div>
-      <button class="close-btn" onclick="closeDetail()">닫기 ✕</button>
-    </div>
+  // 허들
+  const hurdle = yr <= 2028 ? 200 : 100;
+  const met = dsOP >= hurdle;
+  $('hurdleBox').className = 'hurdle ' + (met ? 'h-ok' : 'h-fail');
+  $('hurdleBox').textContent = met
+    ? `✅ 허들(${hurdle}조) 달성 — DS OP ${dsOP}조`
+    : `❌ 허들(${hurdle}조) 미달성 — DS OP ${dsOP}조`;
 
-    <div class="info-grid">
-      <div class="info-item"><div class="info-key">보통주 취득금액</div><div class="info-val">${e.ordAmt.toLocaleString()}억원</div></div>
-      <div class="info-item"><div class="info-key">우선주 취득금액</div><div class="info-val">${e.prefAmt ? e.prefAmt.toLocaleString()+'억원' : '-'}</div></div>
-      <div class="info-item"><div class="info-key">합계</div><div class="info-val accent" style="color:${e.color}">${e.totalTr} (${e.total.toLocaleString()}억원)</div></div>
-      <div class="info-item"><div class="info-key">취득 목적</div><div class="info-val">${e.purpose}</div></div>
-      <div class="info-item"><div class="info-key">취득 기간</div><div class="info-val">${e.period}</div></div>
-      <div class="info-item"><div class="info-key">기준 주가</div><div class="info-val">${e.priceRef}</div></div>
-    </div>
+  // ── OPI 계산 ──
+  // 재원(조) → 만원: × JO
+  const oPoolJo = Math.max(0, dsOP) * 0.1;       // 조
+  const oPool만  = oPoolJo * JO;                  // 만원
+  const oPer만   = tot > 0 ? oPool만 / tot : 0;  // 1인당 만원
+  const oRateRaw = avgS > 0 ? oPer만 / avgS : 0; // 소수 (예: 4.487)
+  const oRate    = Math.min(0.5, oRateRaw);        // 상한 50% = 0.5
+  const oPre만   = myS * oRate * (mon / 12);
+  const oTax만   = oPre만 * tr;
+  const oAft만   = oPre만 - oTax만;
 
-    <div class="ret-big-grid">
-      ${[['1개월',e.ret.m1],['3개월',e.ret.m3],['6개월',e.ret.m6],['12개월',e.ret.m12]].map(([lbl,val])=>{
-        if(val===null) return `<div class="ret-big"><div class="ret-big-label">${lbl}</div><div class="ret-big-val" style="color:#475569;font-size:16px">진행중</div></div>`;
-        const color = val>=20?"#22c55e":val>=5?"#86efac":val<0?"#ef4444":"#94a3b8";
-        const bg = val>=20?"rgba(34,197,94,0.08)":"#0d1520";
-        const border = val>=20?"rgba(34,197,94,0.25)":"#1f2d3d";
-        return `<div class="ret-big" style="background:${bg};border-color:${border}">
-          <div class="ret-big-label">${lbl}</div>
-          <div class="ret-big-val" style="color:${color}">${val>0?'+':''}${val}%</div>
-        </div>`;
-      }).join('')}
-    </div>
+  $('oRate').textContent = P(oRate * 100);
+  $('oPre').textContent  = F(oPre만) + '만';
+  $('oTax').textContent  = '-' + F(oTax만) + '만';
+  $('oAft').textContent  = F(oAft만) + '만';
 
-    <div class="two-col">
-      <div class="detail-box">
-        <div class="detail-box-title" style="color:#F59E0B">📌 취득 배경</div>
-        ${e.bg.map(b=>`<div class="detail-item">${b}</div>`).join('')}
-      </div>
-      <div class="detail-box">
-        <div class="detail-box-title" style="color:#10B981">📈 주가 영향 및 결과</div>
-        ${e.result.map(r=>`<div class="detail-item">${r}</div>`).join('')}
-      </div>
-    </div>
-  `;
+  $('g1').innerHTML = `👉 계산: ${dsOP}조 × 10% = <span class="hi">${oPoolJo.toFixed(1)}조원</span>`;
+  $('g2').innerHTML = `👉 계산: ${oPoolJo.toFixed(1)}조 ÷ ${tot.toLocaleString()}명 = <span class="hi">${F(oPer만)}만</span>`;
+  $('g3').innerHTML = `👉 계산: ${F(oPer만)}만 ÷ ${F(avgS)}만 = <span class="hi">${P(oRate * 100)}</span>`;
+  $('g4').innerHTML = `👉 계산: ${F(myS)}만 × ${P(oRate * 100)} × (${mon}/12) = <span class="hi">${F(oPre만)}만원</span>`;
+  $('g5').innerHTML = `👉 계산: ${F(oPre만)}만 × (1 - ${taxP}%) = <span class="hi">${F(oAft만)}만원</span>`;
 
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function selectEvent(i) {
-  if (selectedIdx === i) {
-    closeDetail();
+  // 허들 미달 시 특별성과급 없음
+  if (!met) {
+    const ids = ['mRate','cRate','fRate','mPre','cPre','fPre','mTax','cTax','fTax',
+      'mSh','cSh','fSh','mShW','cShW','fShW',
+      'mS0','mS1','mS2','cS0','cS1','cS2','fS0','fS1','fS2',
+      'mS0W','mS1W','mS2W','cS0W','cS1W','cS2W',
+      'pkM','pkC','pkF','pkMs','pkCs','pkFs'];
+    ids.forEach(id => { if($(id)) $(id).textContent = '미지급'; });
+    ['s1','s2','s3'].forEach(id => $(id).textContent = '허들 미달성으로 미지급');
+    ['s4','s5','s6'].forEach(id => $(id).innerHTML = '<div class="g-row">허들 미달성으로 미지급</div>');
     return;
   }
-  selectedIdx = i;
-  renderBar();
-  renderCards();
-  renderDetail(i);
+
+  // ── 특별경영성과급 계산 ──
+  const spPoolJo  = Math.max(0, dsOP) * poolPct / 100; // 조
+  const spPool만  = spPoolJo * JO;                      // 만원
+  const bPool만   = spPool만 * bShare;                  // 부문 재원
+  const bizPool만 = spPool만 * bizShare;                // 사업부 재원
+
+  // ② 부문 지급률: 부문재원 ÷ (전체인원 × 평균연봉)
+  const bWHc  = hcM + hcC + hcF; // 모두 ×1.0
+  const bRate = bWHc * avgS > 0 ? bPool만 / (bWHc * avgS) : 0; // 소수
+
+  // ③ 사업부 기초 지급률
+  const penalty = yr >= 2027;
+  const fLoss   = opF < 0;
+  // Foundry/S.LSI 가중치: 적자+페널티면 0, 아니면 자체OP비율
+  const fBW     = (fLoss && penalty) ? 0
+    : (posT > 0 ? posF / posT : 0);
+  const bizWHc  = hcM * 1.0 + hcC * 0.7 + hcF * fBW;
+  const bizBase = bizWHc * avgS > 0 ? bizPool만 / (bizWHc * avgS) : 0; // 소수
+
+  // ④⑤ 최종 지급률
+  const mFinal = bRate + bizBase * 1.0;
+  const cFinal = bRate + bizBase * 0.7;
+  const fFinal = (fLoss && penalty)
+    ? (bRate + bizBase * 0.7) * 0.6
+    : bRate + bizBase * fBW;
+
+  // 사업부별 계산
+  function calcDiv(rate) {
+    const pre = myS * rate * (mon / 12);
+    const tax = pre * tr;
+    const aft = pre - tax;
+    const sh  = spx만 > 0 ? Math.floor(aft / spx만) : 0;
+    const s0  = Math.floor(sh / 3);
+    const s1  = Math.floor(sh / 3);
+    const s2  = sh - s0 - s1;
+    return { pre, tax, aft, sh, s0, s1, s2,
+      w0: s0 * spx만, w1: s1 * spx만, w2: s2 * spx만 };
+  }
+
+  const mR = calcDiv(mFinal);
+  const cR = calcDiv(cFinal);
+  const fR = calcDiv(fFinal);
+
+  function setDiv(p, rate, r) {
+    $(p+'Rate').textContent = P(rate * 100);
+    $(p+'Pre').textContent  = F(r.pre) + '만';
+    $(p+'Tax').textContent  = '-' + F(r.tax) + '만';
+    $(p+'Sh').textContent   = r.sh.toLocaleString() + ' 주';
+    $(p+'ShW').textContent  = F(r.aft) + '만원 상당';
+    $(p+'S0').textContent   = r.s0.toLocaleString();
+    $(p+'S1').textContent   = r.s1.toLocaleString();
+    $(p+'S2').textContent   = r.s2.toLocaleString();
+    $(p+'S0W').textContent  = F(r.w0) + '만';
+    $(p+'S1W').textContent  = F(r.w1) + '만';
+    $(p+'S2W').textContent  = F(r.w2) + '만';
+  }
+  setDiv('m', mFinal, mR);
+  setDiv('c', cFinal, cR);
+  setDiv('f', fFinal, fR);
+
+  function setPkg(p, r) {
+    const total = oAft만 + r.aft;
+    $(p).textContent = F(total) + '만';
+    $(p+'s').textContent = `현금 ${F(oAft만)}만\n+ 주식 ${r.sh.toLocaleString()}주`;
+  }
+  setPkg('pkM', mR); setPkg('pkC', cR); setPkg('pkF', fR);
+
+  // 산식 가이드 특별경영성과급
+  $('s1').innerHTML = `👉 계산: ${dsOP}조 × ${poolPct}% = <span class="hi">${spPoolJo.toFixed(1)}조원</span>`;
+  $('s2').innerHTML = `👉 가중인원: (${(hcM/1000).toFixed(0)}천×1.0) + (${(hcC/1000).toFixed(0)}천×1.0) + (${(hcF/1000).toFixed(0)}천×1.0) = ${(bWHc/1000).toFixed(0)}천명<br>👉 계산: ${(bPool만/JO).toFixed(2)}조 ÷ (${(bWHc/1000).toFixed(0)}천명 × ${F(avgS)}만) = <span class="hi">${P(bRate*100)}</span>`;
+  $('s3').innerHTML = `👉 가중인원: (${(hcM/1000).toFixed(0)}천×1.0) + (${(hcC/1000).toFixed(0)}천×0.7) + (${(hcF/1000).toFixed(0)}천×${fBW.toFixed(2)}) = ${(bizWHc/1000).toFixed(1)}천명<br>👉 계산: ${(bizPool만/JO).toFixed(2)}조 ÷ (${(bizWHc/1000).toFixed(1)}천명 × ${F(avgS)}만) = <span class="hi">${P(bizBase*100)}</span>`;
+  $('s4').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>기초 ${P(bizBase*100)} × 가중치 1.00 = <b style="color:#38bdf8">${P(bizBase*100)}</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>기초 ${P(bizBase*100)} × 가중치 0.70 = <b style="color:#facc15">${P(bizBase*0.7*100)}</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>기초 ${P(bizBase*100)} × 가중치 ${fBW.toFixed(2)} = <b style="color:#f472b6">${P(bizBase*fBW*100)}</b></span></div>`;
+  $('s5').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*100)} = <b style="color:#38bdf8">${P(mFinal*100)}</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*0.7*100)} = <b style="color:#facc15">${P(cFinal*100)}</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*fBW*100)} = <b style="color:#f472b6">${P(fFinal*100)}</b>${fLoss&&penalty?' (공통의 60%)':''}</span></div>`;
+  $('s6').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>세후 ${F(mR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#38bdf8">${mR.sh.toLocaleString()}주</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>세후 ${F(cR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#facc15">${cR.sh.toLocaleString()}주</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>세후 ${F(fR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#f472b6">${fR.sh.toLocaleString()}주</b></span></div>`;
 }
 
-function closeDetail() {
-  selectedIdx = null;
-  document.getElementById('detailPanel').style.display = 'none';
-  renderBar();
-  renderCards();
-}
-
-// 초기 렌더링
-renderBar();
-renderCards();
+go();
 </script>
 </body>
 </html>
