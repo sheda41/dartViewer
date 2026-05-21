@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Samsung Bonus</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0b0e1a;color:#e2e8f0;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;padding:16px;min-height:100vh}
+.wrap{max-width:480px;margin:0 auto}
+.hd{text-align:center;margin-bottom:18px}
+.hd-badge{display:inline-block;background:linear-gradient(90deg,#9333ea,#db2777);border-radius:99px;padding:4px 18px;font-size:11px;color:#fff;letter-spacing:1px;margin-bottom:10px}
+.hd h1{font-size:21px;font-weight:900;letter-spacing:-.5px}
+.warn-box{background:#1a0808;border:1px solid #7f1d1d;border-radius:10px;padding:10px 14px;font-size:12px;color:#fca5a5;text-align:center;line-height:1.6;margin-bottom:14px}
+.card{background:#141827;border-radius:14px;padding:16px;margin-bottom:12px}
+.card-ttl{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.hc-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.hc-lbl{font-size:12px;font-weight:700;margin-bottom:5px}
+.hc-box{display:flex;align-items:center;background:#0b0e1a;border:1px solid #1e293b;border-radius:8px;padding:7px 9px}
+.hc-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:15px;font-weight:700;text-align:right;outline:none;font-family:inherit;width:0}
+.hc-u{color:#64748b;font-size:12px;margin-left:3px;flex-shrink:0}
+.hc-sum{text-align:right;font-size:12px;color:#64748b}
+.hc-sum b{color:#f1f5f9}
+.yr-wrap{position:relative;margin-bottom:12px}
+.yr-lbl{font-size:11px;color:#64748b;margin-bottom:5px}
+.yr-sel{width:100%;background:#0b0e1a;border:2px solid #b45309;border-radius:10px;color:#fbbf24;font-size:13px;font-weight:700;padding:11px 14px;outline:none;font-family:inherit;cursor:pointer;appearance:none;-webkit-appearance:none}
+.yr-arrow{position:absolute;right:13px;top:50%;transform:translateY(50%);color:#fbbf24;pointer-events:none;font-size:12px}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pf label{display:block;font-size:11px;color:#64748b;margin-bottom:4px}
+.pf-box{display:flex;align-items:center;background:#0b0e1a;border:1px solid #1e293b;border-radius:8px;padding:7px 9px}
+.pf-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:14px;font-weight:700;text-align:right;outline:none;font-family:inherit;min-width:0}
+.pf-u{color:#64748b;font-size:12px;margin-left:3px;flex-shrink:0}
+.pf-u2{color:#64748b;font-size:12px;margin-right:3px;flex-shrink:0}
+.opi-card{background:#0a1a0f;border:1px solid #166534;border-radius:13px;padding:14px;margin-bottom:12px}
+.opi-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.opi-ttl{font-size:15px;font-weight:800}
+.opi-badge{background:#14532d;border:1px solid #16a34a;border-radius:99px;padding:2px 10px;font-size:11px;color:#4ade80}
+.opi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.oi label{display:block;font-size:11px;color:#64748b;margin-bottom:3px}
+.oi .v{font-size:19px;font-weight:800}
+.vg{color:#4ade80}.vr{color:#f87171}.vw{color:#f1f5f9}
+.op-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.op-box{border-radius:10px;padding:12px}
+.op-mem{background:#0b0e1a;border:1px solid #38bdf844}
+.op-fnd{background:#0b0e1a;border:1px solid #f472b644}
+.op-name{font-size:13px;font-weight:700;margin-bottom:8px}
+.op-in-row{display:flex;align-items:center;background:#141827;border-radius:7px;padding:7px 10px}
+.op-in{flex:1;background:transparent;border:none;color:#f1f5f9;font-size:16px;font-weight:700;text-align:right;outline:none;font-family:inherit;min-width:0}
+.op-u{color:#64748b;font-size:13px;margin-left:4px}
+.op-contrib{font-size:11px;color:#64748b;margin-top:5px}
+.op-note{background:#0b0e1a;border-radius:8px;padding:9px 11px;font-size:11px;color:#64748b;line-height:1.7;margin-bottom:12px}
+.sl-row{margin-bottom:14px}
+.sl-hdr{display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px}
+.sl-nm{color:#94a3b8}
+.sl-v{font-weight:700}
+.track{position:relative;height:8px;border-radius:4px;background:#1e293b}
+.fill{position:absolute;left:0;top:0;height:100%;border-radius:4px;pointer-events:none}
+.track input[type=range]{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer;margin:0;height:100%}
+.hurdle{border-radius:9px;padding:11px 14px;font-size:13px;font-weight:700;text-align:center;margin-top:4px}
+.h-ok{background:#052e16;border:1px solid #16a34a;color:#4ade80}
+.h-fail{background:#2a0a0a;border:1px solid #dc2626;color:#f87171}
+.div-card{border-radius:13px;padding:15px;margin-bottom:10px}
+.dc-mem{background:#0d1929;border-top:2px solid #38bdf8}
+.dc-com{background:#1a1a08;border-top:2px solid #facc15}
+.dc-fnd{background:#1c0d1c;border-top:2px solid #f472b6}
+.dc-name{text-align:center;font-size:16px;font-weight:800;margin-bottom:11px}
+.dc-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.dc-lbl{color:#94a3b8}
+.dc-purple{color:#a78bfa;font-weight:700}
+.dc-white{color:#f1f5f9}
+.dc-red{color:#f87171;font-weight:700}
+.stk-box{background:#0b0e1a;border-radius:9px;padding:13px;margin-top:10px}
+.stk-lbl{text-align:center;font-size:11px;color:#a78bfa;font-weight:700;margin-bottom:3px}
+.stk-num{text-align:center;font-size:28px;font-weight:900;color:#38bdf8}
+.stk-sub{text-align:center;font-size:11px;color:#64748b;margin-bottom:11px}
+.stk-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.stk-t{background:#141827;border-radius:7px;padding:9px;text-align:center}
+.stk-t.on{background:#1a2a3e;border:1px solid #38bdf844}
+.st-lbl{font-size:10px;color:#64748b;margin-bottom:3px}
+.st-n{font-size:17px;font-weight:800;color:#38bdf8}
+.st-w{font-size:10px;color:#64748b;margin-top:2px}
+.pkg-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pkg-c{background:#1a1f30;border-radius:11px;padding:11px 8px;text-align:center}
+.pkg-nm{font-size:11px;font-weight:700;margin-bottom:6px}
+.pkg-tot{font-size:16px;font-weight:900;margin-bottom:5px}
+.pkg-sub{font-size:10px;color:#94a3b8;line-height:1.6;white-space:pre-line}
+.guide{background:#10131f;border:1px solid #1e293b;border-radius:13px;padding:15px;margin-bottom:10px}
+.g-ttl{text-align:center;font-size:14px;font-weight:800;margin-bottom:14px}
+.g-step{margin-bottom:15px;padding-bottom:15px;border-bottom:1px solid #1e293b}
+.g-step:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.g-num{font-size:13px;font-weight:700;margin-bottom:5px}
+.g-form{font-size:11px;color:#94a3b8;margin-bottom:6px;line-height:1.6}
+.g-calc{background:#0b0e1a;border-radius:7px;padding:8px 11px;font-size:12px;line-height:1.7}
+.g-rows{display:flex;flex-direction:column;gap:4px}
+.g-row{background:#0b0e1a;border-radius:6px;padding:6px 10px;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.hi{color:#a78bfa;font-weight:700}
+.footer{text-align:center;color:#334155;font-size:11px;margin-top:16px;padding-bottom:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hd">
+  <div class="hd-badge">성과급 — 시뮬레이터 Pro</div>
+  <h1>SAMSUNG 성과급 시뮬레이터</h1>
+</div>
+<div class="warn-box">⚠️ 본 시뮬레이터는 단순 참고용이며, 공식적인 기준과 차이가 있을 수<br>있습니다. 실제 수령액과 다를 수 있습니다.</div>
+
+<!-- 인원 설정 -->
+<div class="card">
+  <div class="card-ttl">👥 사업부별 인원 설정</div>
+  <div class="hc-row">
+    <div>
+      <div class="hc-lbl" style="color:#38bdf8">메모리</div>
+      <div class="hc-box"><input class="hc-in" id="hcM" type="number" value="27000" oninput="go()"><span class="hc-u">명</span></div>
+    </div>
+    <div>
+      <div class="hc-lbl" style="color:#f472b6">Foundry/S.LSI</div>
+      <div class="hc-box"><input class="hc-in" id="hcF" type="number" value="23000" oninput="go()"><span class="hc-u">명</span></div>
+    </div>
+    <div>
+      <div class="hc-lbl" style="color:#facc15">공통조직</div>
+      <div class="hc-box"><input class="hc-in" id="hcC" type="number" value="28000" oninput="go()"><span class="hc-u">명</span></div>
+    </div>
+  </div>
+  <div class="hc-sum">💡 합계 총 인원: <b id="hcTot">78,000</b>명</div>
+</div>
+
+<!-- 개인·공통 설정 -->
+<div class="card">
+  <div class="card-ttl">🧑 개인 · 공통 설정</div>
+  <div class="yr-lbl">📌 적용 연도 (허들 및 페널티 자동 연동)</div>
+  <div class="yr-wrap">
+    <select class="yr-sel" id="yrSel" onchange="go()">
+      <option value="2026">2026년 (허들 200조 / 적자 페널티 미적용)</option>
+      <option value="2027">2027년 (허들 200조 / 적자 페널티 적용)</option>
+      <option value="2028">2028년 (허들 200조 / 적자 페널티 적용)</option>
+      <option value="2029">2029년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2030">2030년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2031">2031년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2032">2032년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2033">2033년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2034">2034년 (허들 100조 / 적자 페널티 적용)</option>
+      <option value="2035">2035년 (허들 100조 / 적자 페널티 적용)</option>
+    </select>
+    <span class="yr-arrow">▼</span>
+  </div>
+  <div class="pg">
+    <div class="pf"><label>내 계약 연봉</label><div class="pf-box"><input class="pf-in" id="myS" type="number" value="5500" oninput="go()"><span class="pf-u">만원</span></div></div>
+    <div class="pf"><label>근무 개월 수</label><div class="pf-box"><input class="pf-in" id="mon" type="number" value="12" min="1" max="12" oninput="go()"><span class="pf-u">개월</span></div></div>
+    <div class="pf"><label>회사 평균 연봉</label><div class="pf-box"><input class="pf-in" id="avgS" type="number" value="8000" oninput="go()"><span class="pf-u">만원</span></div></div>
+    <div class="pf"><label>자사주 기준가</label><div class="pf-box"><span class="pf-u2">₩</span><input class="pf-in" id="spx" type="number" value="290000" oninput="go()"><span class="pf-u">₩</span></div></div>
+    <div class="pf" style="grid-column:1/3"><label>통합 실효세율</label><div class="pf-box"><input class="pf-in" id="tax" type="number" value="36" oninput="go()"><span class="pf-u">%</span></div></div>
+  </div>
+</div>
+
+<!-- OPI -->
+<div class="opi-card">
+  <div class="opi-hdr">
+    <span style="font-size:18px">💵</span>
+    <span class="opi-ttl">OPI (성과인센티브)</span>
+    <span class="opi-badge">재원 OP × 10%</span>
+  </div>
+  <div class="opi-grid">
+    <div class="oi"><label>지급률(상한50%)</label><div class="v vg" id="oRate">-</div></div>
+    <div class="oi"><label>세전(개월비례)</label><div class="v vw" id="oPre">-</div></div>
+    <div class="oi"><label>세금제외</label><div class="v vr" id="oTax">-</div></div>
+    <div class="oi"><label>세후 실수령</label><div class="v vg" id="oAft">-</div></div>
+  </div>
+</div>
+
+<!-- 특별경영성과급 -->
+<div class="card">
+  <div class="card-ttl">📈 특별경영성과급 시뮬레이션</div>
+  <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">▸ 사업부별 DS 영업이익 직접 입력</div>
+  <div class="op-grid">
+    <div class="op-box op-mem">
+      <div class="op-name" style="color:#38bdf8">💾 메모리 사업부</div>
+      <div class="op-in-row"><input class="op-in" id="opM" type="number" value="280" oninput="go()"><span class="op-u">조</span></div>
+      <div class="op-contrib">OP 기여 비중: <b id="mCon" style="color:#38bdf8">100.0%</b></div>
+    </div>
+    <div class="op-box op-fnd">
+      <div class="op-name" style="color:#f472b6">🏭 Foundry/S.LSI 사업부</div>
+      <div class="op-in-row"><input class="op-in" id="opF" type="number" value="0" oninput="go()"><span class="op-u">조</span></div>
+      <div class="op-contrib">OP 기여 비중: <b id="fCon" style="color:#f472b6">0.0%</b></div>
+    </div>
+  </div>
+  <div class="op-note">
+    💡 <b style="color:#e2e8f0">DS 전체 영업이익(OP)</b> = 메모리 + Foundry/S.LSI 합산 (적자 시 음수 반영)<br>
+    ※ 공통 조직은 배분 대상에 포함되나 독자적인 OP는 산정하지 않습니다.<br>
+    ※ <b style="color:#e2e8f0">특별경영성과급 재원</b> = 흑자 달성 시(전체 OP &gt; 0) 전체 OP × 재원 확보 비율
+  </div>
+  <div class="sl-row">
+    <div class="sl-hdr"><span class="sl-nm">재원 확보 비율 (DS OP 대비)</span><span class="sl-v" id="poolV" style="color:#a78bfa">10.5%</span></div>
+    <div class="track">
+      <div class="fill" id="poolFill" style="background:#a78bfa"></div>
+      <input type="range" id="poolR" min="0" max="50" step="0.5" value="10.5" oninput="go()">
+    </div>
+  </div>
+  <div class="sl-row">
+    <div class="sl-hdr"><span class="sl-nm">부문 : 사업부 배분 비율</span><span class="sl-v" id="ratV" style="color:#facc15">40 : 60</span></div>
+    <div class="track">
+      <div class="fill" id="ratFill" style="background:#facc15"></div>
+      <input type="range" id="ratR" min="0" max="10" step="1" value="4" oninput="go()">
+    </div>
+  </div>
+  <div class="hurdle h-ok" id="hurdleBox">✅ 허들(200조) 달성 — DS OP 280조</div>
+</div>
+
+<!-- 사업부별 자사주 명세 -->
+<div class="card">
+  <div class="card-ttl">📊 사업부별 자사주 지급 명세</div>
+  <div class="div-card dc-mem">
+    <div class="dc-name" style="color:#38bdf8">메모리</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="mRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="mPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl1">36</span>%)</span><span class="dc-red" id="mTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="mSh">-</div>
+      <div class="stk-sub" id="mShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="mS0">-</div><div class="st-w" id="mS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="mS1">-</div><div class="st-w" id="mS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="mS2">-</div><div class="st-w" id="mS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="div-card dc-com">
+    <div class="dc-name" style="color:#facc15">공통</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="cRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="cPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl2">36</span>%)</span><span class="dc-red" id="cTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="cSh">-</div>
+      <div class="stk-sub" id="cShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="cS0">-</div><div class="st-w" id="cS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="cS1">-</div><div class="st-w" id="cS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="cS2">-</div><div class="st-w" id="cS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="div-card dc-fnd">
+    <div class="dc-name" style="color:#f472b6">Foundry/S.LSI</div>
+    <div class="dc-row"><span class="dc-lbl">지급률</span><span class="dc-purple" id="fRate">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세전 (12개월)</span><span class="dc-white" id="fPre">-</span></div>
+    <div class="dc-row"><span class="dc-lbl">세금 (<span id="tl3">36</span>%)</span><span class="dc-red" id="fTax">-</span></div>
+    <div class="stk-box">
+      <div class="stk-lbl">자사주 총 수량</div>
+      <div class="stk-num" id="fSh">-</div>
+      <div class="stk-sub" id="fShW">-</div>
+      <div class="stk-3">
+        <div class="stk-t on"><div class="st-lbl">즉시</div><div class="st-n" id="fS0">-</div><div class="st-w" id="fS0W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">1년후</div><div class="st-n" id="fS1">-</div><div class="st-w" id="fS1W">-</div></div>
+        <div class="stk-t"><div class="st-lbl">2년후</div><div class="st-n" id="fS2">-</div><div class="st-w" id="fS2W">-</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 최종 수령 패키지 -->
+<div class="card">
+  <div class="card-ttl">🎯 최종 수령 패키지 (세후)</div>
+  <div class="pkg-grid">
+    <div class="pkg-c" style="border-top:2px solid #38bdf8">
+      <div class="pkg-nm" style="color:#38bdf8">메모리 총합</div>
+      <div class="pkg-tot" id="pkM" style="color:#38bdf8">-</div>
+      <div class="pkg-sub" id="pkMs">-</div>
+    </div>
+    <div class="pkg-c" style="border-top:2px solid #facc15">
+      <div class="pkg-nm" style="color:#facc15">공통 총합</div>
+      <div class="pkg-tot" id="pkC" style="color:#facc15">-</div>
+      <div class="pkg-sub" id="pkCs">-</div>
+    </div>
+    <div class="pkg-c" style="border-top:2px solid #f472b6">
+      <div class="pkg-nm" style="color:#f472b6">Foundry/S.LSI 총합</div>
+      <div class="pkg-tot" id="pkF" style="color:#f472b6">-</div>
+      <div class="pkg-sub" id="pkFs">-</div>
+    </div>
+  </div>
+</div>
+
+<!-- 산식 가이드 OPI -->
+<div class="guide">
+  <div class="g-ttl">💵 OPI 산출 과정</div>
+  <div class="g-step">
+    <div class="g-num">① 전체 OPI 재원</div>
+    <div class="g-form">💡 공식: DS 전체 영업이익(양수) × 10%</div>
+    <div class="g-calc" id="g1">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">② 1인당 배분액</div>
+    <div class="g-form">💡 공식: 전체 OPI 재원 ÷ 총 인원수</div>
+    <div class="g-calc" id="g2">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">③ OPI 지급률 <span style="color:#64748b;font-size:11px">(최대 상한선 50%)</span></div>
+    <div class="g-form">💡 공식: 1인당 배분액 ÷ 회사 평균 연봉</div>
+    <div class="g-calc" id="g3">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">④ 내 OPI (세전)</div>
+    <div class="g-form">💡 공식: 내 연봉 × OPI 지급률 × (근무개월수 ÷ 12)</div>
+    <div class="g-calc" id="g4">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑤ 세후 실수령액</div>
+    <div class="g-form">💡 공식: 세전 금액 × (1 - 실효세율)</div>
+    <div class="g-calc" id="g5">-</div>
+  </div>
+</div>
+
+<!-- 산식 가이드 특별 -->
+<div class="guide">
+  <div class="g-ttl">📈 특별경영성과급 산출 과정</div>
+  <div class="g-step">
+    <div class="g-num">① 전체 확보 재원</div>
+    <div class="g-form">💡 공식: DS 전체 영업이익(적자 시 0원) × 재원 확보 비율</div>
+    <div class="g-calc" id="s1">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">② 부문(공통) 지급률</div>
+    <div class="g-form">💡 공식: 부문 배분 재원(전체의 40%) ÷ (부문 가중인원 × 평균연봉)<br>※ 부문 가중인원 = (메모리×1.0) + (공통×1.0) + (Foundry/S.LSI×1.0)</div>
+    <div class="g-calc" id="s2">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">③ 사업부 기초 지급률 <span style="color:#64748b;font-size:11px">(가장 중요!)</span></div>
+    <div class="g-form">💡 공식: 사업부 배분 재원(전체의 60%) ÷ (사업부 가중인원 × 평균연봉)<br>※ 사업부 가중인원 = (메모리×1.0) + (공통×0.7) + (Foundry/S.LSI×자체영익비율)</div>
+    <div class="g-calc" id="s3">-</div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">④ 사업부별 가중치 적용 지급률</div>
+    <div class="g-form">💡 공식: ③에서 구한 사업부 기초 지급률 × 각 사업부 가중치</div>
+    <div class="g-rows" id="s4"></div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑤ 최종 합산 지급률</div>
+    <div class="g-form">💡 공식: ② 부문 지급률 + ④ 사업부 가중치 적용 지급률</div>
+    <div class="g-rows" id="s5"></div>
+  </div>
+  <div class="g-step">
+    <div class="g-num">⑥ 내 자사주 수량 도출</div>
+    <div class="g-form">💡 공식: [내 연봉 × 최종 지급률 × 세금제외 × 근무비율] ÷ 자사주 기준가</div>
+    <div class="g-rows" id="s6"></div>
+  </div>
+</div>
+
+<div class="footer">* 실제 성과급과 다를 수 있습니다. 참고용으로만 사용하세요.</div>
+</div>
+
+<script>
+// 단위: 만원
+// 1조 = 10^12원 = 10^8 만원
+const JO = 100000000;
+const $ = id => document.getElementById(id);
+const F = n => Math.round(n).toLocaleString();
+const P = n => n.toFixed(1) + '%';
+
+function go() {
+  // 입력값
+  const hcM = +$('hcM').value || 0;
+  const hcF = +$('hcF').value || 0;
+  const hcC = +$('hcC').value || 0;
+  const tot = hcM + hcF + hcC;
+  $('hcTot').textContent = tot.toLocaleString();
+
+  const yr    = +$('yrSel').value;
+  const myS   = +$('myS').value  || 0;   // 만원
+  const mon   = Math.min(12, Math.max(1, +$('mon').value || 12));
+  const avgS  = +$('avgS').value || 1;   // 만원
+  const spx원  = +$('spx').value  || 1;   // 원
+  const spx만  = spx원 / 10000;           // 만원
+  const taxP  = +$('tax').value  || 0;
+  const tr    = taxP / 100;
+  const opM   = +$('opM').value  || 0;   // 조
+  const opF   = +$('opF').value  || 0;   // 조
+  const dsOP  = opM + opF;               // 조
+
+  // OP 기여 비중
+  const posM = Math.max(0, opM);
+  const posF = Math.max(0, opF);
+  const posT = posM + posF;
+  $('mCon').textContent = posT > 0 ? P(posM / posT * 100) : '0.0%';
+  $('fCon').textContent = posT > 0 ? P(posF / posT * 100) : '0.0%';
+
+  // 세율 라벨
+  ['tl1','tl2','tl3'].forEach(id => $(id).textContent = taxP);
+
+  // 슬라이더
+  const poolPct = +$('poolR').value;
+  $('poolV').textContent = poolPct.toFixed(1) + '%';
+  $('poolFill').style.width = (poolPct / 50 * 100) + '%';
+
+  const ratN = +$('ratR').value;  // 0~10 (부문 비율)
+  $('ratV').textContent = (ratN * 10) + ' : ' + ((10 - ratN) * 10);
+  $('ratFill').style.width = (ratN / 10 * 100) + '%';
+  const bShare   = ratN / 10;      // 부문 비율
+  const bizShare = 1 - bShare;     // 사업부 비율
+
+  // 허들
+  const hurdle = yr <= 2028 ? 200 : 100;
+  const met = dsOP >= hurdle;
+  $('hurdleBox').className = 'hurdle ' + (met ? 'h-ok' : 'h-fail');
+  $('hurdleBox').textContent = met
+    ? `✅ 허들(${hurdle}조) 달성 — DS OP ${dsOP}조`
+    : `❌ 허들(${hurdle}조) 미달성 — DS OP ${dsOP}조`;
+
+  // ── OPI 계산 ──
+  // 재원(조) → 만원: × JO
+  const oPoolJo = Math.max(0, dsOP) * 0.1;       // 조
+  const oPool만  = oPoolJo * JO;                  // 만원
+  const oPer만   = tot > 0 ? oPool만 / tot : 0;  // 1인당 만원
+  const oRateRaw = avgS > 0 ? oPer만 / avgS : 0; // 소수 (예: 4.487)
+  const oRate    = Math.min(0.5, oRateRaw);        // 상한 50% = 0.5
+  const oPre만   = myS * oRate * (mon / 12);
+  const oTax만   = oPre만 * tr;
+  const oAft만   = oPre만 - oTax만;
+
+  $('oRate').textContent = P(oRate * 100);
+  $('oPre').textContent  = F(oPre만) + '만';
+  $('oTax').textContent  = '-' + F(oTax만) + '만';
+  $('oAft').textContent  = F(oAft만) + '만';
+
+  $('g1').innerHTML = `👉 계산: ${dsOP}조 × 10% = <span class="hi">${oPoolJo.toFixed(1)}조원</span>`;
+  $('g2').innerHTML = `👉 계산: ${oPoolJo.toFixed(1)}조 ÷ ${tot.toLocaleString()}명 = <span class="hi">${F(oPer만)}만</span>`;
+  $('g3').innerHTML = `👉 계산: ${F(oPer만)}만 ÷ ${F(avgS)}만 = <span class="hi">${P(oRate * 100)}</span>`;
+  $('g4').innerHTML = `👉 계산: ${F(myS)}만 × ${P(oRate * 100)} × (${mon}/12) = <span class="hi">${F(oPre만)}만원</span>`;
+  $('g5').innerHTML = `👉 계산: ${F(oPre만)}만 × (1 - ${taxP}%) = <span class="hi">${F(oAft만)}만원</span>`;
+
+  // 허들 미달 시 특별성과급 없음
+  if (!met) {
+    const ids = ['mRate','cRate','fRate','mPre','cPre','fPre','mTax','cTax','fTax',
+      'mSh','cSh','fSh','mShW','cShW','fShW',
+      'mS0','mS1','mS2','cS0','cS1','cS2','fS0','fS1','fS2',
+      'mS0W','mS1W','mS2W','cS0W','cS1W','cS2W',
+      'pkM','pkC','pkF','pkMs','pkCs','pkFs'];
+    ids.forEach(id => { if($(id)) $(id).textContent = '미지급'; });
+    ['s1','s2','s3'].forEach(id => $(id).textContent = '허들 미달성으로 미지급');
+    ['s4','s5','s6'].forEach(id => $(id).innerHTML = '<div class="g-row">허들 미달성으로 미지급</div>');
+    return;
+  }
+
+  // ── 특별경영성과급 계산 ──
+  const spPoolJo  = Math.max(0, dsOP) * poolPct / 100; // 조
+  const spPool만  = spPoolJo * JO;                      // 만원
+  const bPool만   = spPool만 * bShare;                  // 부문 재원
+  const bizPool만 = spPool만 * bizShare;                // 사업부 재원
+
+  // ② 부문 지급률: 부문재원 ÷ (전체인원 × 평균연봉)
+  const bWHc  = hcM + hcC + hcF; // 모두 ×1.0
+  const bRate = bWHc * avgS > 0 ? bPool만 / (bWHc * avgS) : 0; // 소수
+
+  // ③ 사업부 기초 지급률
+  const penalty = yr >= 2027;
+  const fLoss   = opF < 0;
+  // Foundry/S.LSI 가중치: 적자+페널티면 0, 아니면 자체OP비율
+  const fBW     = (fLoss && penalty) ? 0
+    : (posT > 0 ? posF / posT : 0);
+  const bizWHc  = hcM * 1.0 + hcC * 0.7 + hcF * fBW;
+  const bizBase = bizWHc * avgS > 0 ? bizPool만 / (bizWHc * avgS) : 0; // 소수
+
+  // ④⑤ 최종 지급률
+  const mFinal = bRate + bizBase * 1.0;
+  const cFinal = bRate + bizBase * 0.7;
+  const fFinal = (fLoss && penalty)
+    ? (bRate + bizBase * 0.7) * 0.6
+    : bRate + bizBase * fBW;
+
+  // 사업부별 계산
+  function calcDiv(rate) {
+    const pre = myS * rate * (mon / 12);
+    const tax = pre * tr;
+    const aft = pre - tax;
+    const sh  = spx만 > 0 ? Math.floor(aft / spx만) : 0;
+    const s0  = Math.floor(sh / 3);
+    const s1  = Math.floor(sh / 3);
+    const s2  = sh - s0 - s1;
+    return { pre, tax, aft, sh, s0, s1, s2,
+      w0: s0 * spx만, w1: s1 * spx만, w2: s2 * spx만 };
+  }
+
+  const mR = calcDiv(mFinal);
+  const cR = calcDiv(cFinal);
+  const fR = calcDiv(fFinal);
+
+  function setDiv(p, rate, r) {
+    $(p+'Rate').textContent = P(rate * 100);
+    $(p+'Pre').textContent  = F(r.pre) + '만';
+    $(p+'Tax').textContent  = '-' + F(r.tax) + '만';
+    $(p+'Sh').textContent   = r.sh.toLocaleString() + ' 주';
+    $(p+'ShW').textContent  = F(r.aft) + '만원 상당';
+    $(p+'S0').textContent   = r.s0.toLocaleString();
+    $(p+'S1').textContent   = r.s1.toLocaleString();
+    $(p+'S2').textContent   = r.s2.toLocaleString();
+    $(p+'S0W').textContent  = F(r.w0) + '만';
+    $(p+'S1W').textContent  = F(r.w1) + '만';
+    $(p+'S2W').textContent  = F(r.w2) + '만';
+  }
+  setDiv('m', mFinal, mR);
+  setDiv('c', cFinal, cR);
+  setDiv('f', fFinal, fR);
+
+  function setPkg(p, r) {
+    const total = oAft만 + r.aft;
+    $(p).textContent = F(total) + '만';
+    $(p+'s').textContent = `현금 ${F(oAft만)}만\n+ 주식 ${r.sh.toLocaleString()}주`;
+  }
+  setPkg('pkM', mR); setPkg('pkC', cR); setPkg('pkF', fR);
+
+  // 산식 가이드 특별경영성과급
+  $('s1').innerHTML = `👉 계산: ${dsOP}조 × ${poolPct}% = <span class="hi">${spPoolJo.toFixed(1)}조원</span>`;
+  $('s2').innerHTML = `👉 가중인원: (${(hcM/1000).toFixed(0)}천×1.0) + (${(hcC/1000).toFixed(0)}천×1.0) + (${(hcF/1000).toFixed(0)}천×1.0) = ${(bWHc/1000).toFixed(0)}천명<br>👉 계산: ${(bPool만/JO).toFixed(2)}조 ÷ (${(bWHc/1000).toFixed(0)}천명 × ${F(avgS)}만) = <span class="hi">${P(bRate*100)}</span>`;
+  $('s3').innerHTML = `👉 가중인원: (${(hcM/1000).toFixed(0)}천×1.0) + (${(hcC/1000).toFixed(0)}천×0.7) + (${(hcF/1000).toFixed(0)}천×${fBW.toFixed(2)}) = ${(bizWHc/1000).toFixed(1)}천명<br>👉 계산: ${(bizPool만/JO).toFixed(2)}조 ÷ (${(bizWHc/1000).toFixed(1)}천명 × ${F(avgS)}만) = <span class="hi">${P(bizBase*100)}</span>`;
+  $('s4').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>기초 ${P(bizBase*100)} × 가중치 1.00 = <b style="color:#38bdf8">${P(bizBase*100)}</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>기초 ${P(bizBase*100)} × 가중치 0.70 = <b style="color:#facc15">${P(bizBase*0.7*100)}</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>기초 ${P(bizBase*100)} × 가중치 ${fBW.toFixed(2)} = <b style="color:#f472b6">${P(bizBase*fBW*100)}</b></span></div>`;
+  $('s5').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*100)} = <b style="color:#38bdf8">${P(mFinal*100)}</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*0.7*100)} = <b style="color:#facc15">${P(cFinal*100)}</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>부문 ${P(bRate*100)} + 사업부 ${P(bizBase*fBW*100)} = <b style="color:#f472b6">${P(fFinal*100)}</b>${fLoss&&penalty?' (공통의 60%)':''}</span></div>`;
+  $('s6').innerHTML = `
+    <div class="g-row"><span style="color:#38bdf8">메모리</span><span>세후 ${F(mR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#38bdf8">${mR.sh.toLocaleString()}주</b></span></div>
+    <div class="g-row"><span style="color:#facc15">공통</span><span>세후 ${F(cR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#facc15">${cR.sh.toLocaleString()}주</b></span></div>
+    <div class="g-row"><span style="color:#f472b6">Foundry/S.LSI</span><span>세후 ${F(fR.aft)}만 ÷ ${F(spx만)}만 = <b style="color:#f472b6">${fR.sh.toLocaleString()}주</b></span></div>`;
+}
+
+go();
+</script>
+</body>
+</html>
