@@ -1,746 +1,787 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WeekTask · 부서 업무 관리</title>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
-  <style>
-    :root{
-      --bg:#0d1117;--sf:#161b22;--sf2:#21262d;--sf3:#2d333b;
-      --bd:#30363d;--bd2:#444c56;
-      --tx:#e6edf3;--tx2:#8b949e;--tx3:#6e7681;
-      --ac:#58a6ff;--ac-dim:rgba(88,166,255,0.12);
-      --r:10px;--rsm:6px;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{font-size:14px}
-    body{background:var(--bg);color:var(--tx);font-family:'Noto Sans KR',sans-serif;min-height:100vh;line-height:1.5}
+import { useState, useMemo } from "react";
 
-    /* Header */
-    #hdr{position:sticky;top:0;z-index:100;background:var(--sf);border-bottom:1px solid var(--bd);
-      height:56px;display:flex;align-items:center;padding:0 20px;gap:10px}
-    .logo{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;
-      color:var(--tx);display:flex;align-items:center;gap:7px;white-space:nowrap}
-    .logo-dot{width:8px;height:8px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-    .hdr-right{display:flex;align-items:center;gap:8px;margin-left:auto}
-    .input-search{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);
-      border-radius:var(--rsm);padding:6px 11px;font-size:13px;
-      font-family:'Noto Sans KR',sans-serif;width:170px;outline:none;transition:border-color .15s,width .2s}
-    .input-search:focus{border-color:var(--ac);width:210px}
-    .input-search::placeholder{color:var(--tx3)}
-    .sel-hdr{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2);
-      border-radius:var(--rsm);padding:6px 10px;font-size:13px;
-      font-family:'Noto Sans KR',sans-serif;outline:none;cursor:pointer;transition:border-color .12s}
-    .sel-hdr:hover,.sel-hdr:focus{border-color:var(--ac);color:var(--tx)}
-    .sel-hdr option{background:#21262d}
-    .btn-primary{background:var(--ac);color:#0d1117;border:none;padding:7px 15px;
-      border-radius:var(--rsm);font-size:13px;font-weight:700;
-      font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;transition:opacity .15s}
-    .btn-primary:hover{opacity:.85}
+// ─── 팔레트 & 디자인 토큰 ────────────────────────────────────────
+// 기업 내부 감사 툴: 딥네이비 기반, 엠버 액센트, 모노스페이스 숫자 강조
+// 서체: system-ui 계열, 데이터는 tabular-nums
 
-    /* Week Nav */
-    #week-nav{background:var(--sf);border-bottom:1px solid var(--bd);
-      padding:9px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .wn-ctrl{display:flex;align-items:center;gap:7px}
-    .btn-week{background:var(--sf2);border:1px solid var(--bd);color:var(--tx2);
-      width:28px;height:28px;border-radius:var(--rsm);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .12s}
-    .btn-week:hover{border-color:var(--ac);color:var(--ac)}
-    .week-lbl{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;min-width:52px;text-align:center}
-    .week-sub{font-size:12px;color:var(--tx3)}
-    .btn-today{background:none;border:1px solid var(--bd);color:var(--tx3);
-      padding:4px 9px;border-radius:var(--rsm);font-size:12px;
-      font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .12s}
-    .btn-today:hover{border-color:var(--ac);color:var(--ac)}
-
-    /* Filter Nav */
-    #filter-nav{background:var(--sf);border-bottom:1px solid var(--bd);
-      padding:0 20px;display:flex;align-items:center;gap:1px;overflow-x:auto}
-    #filter-nav::-webkit-scrollbar{display:none}
-    .ftab{background:none;border:none;border-bottom:2px solid transparent;color:var(--tx2);
-      padding:9px 13px;font-size:13px;font-weight:500;
-      font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;
-      display:flex;align-items:center;gap:5px;transition:all .12s}
-    .ftab:hover{color:var(--tx)}
-    .ftab.active{color:var(--tx);border-bottom-color:var(--ac)}
-    .chip{background:var(--sf2);border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600;color:var(--tx3)}
-    .ftab.active .chip{background:var(--ac-dim);color:var(--ac)}
-
-    /* Main */
-    #main-area{padding:18px 20px;max-width:1440px;margin:0 auto}
-
-    /* Stats */
-    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:16px}
-    .stat{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px}
-    .stat-label{font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
-    .stat-val{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;line-height:1}
-    .stat-sub{font-size:12px;font-weight:600;color:#e6edf3;margin-top:5px}
-
-    /* Kanban */
-    .kanban{display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;align-items:start}
-    .kol{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);
-      min-height:180px;display:flex;flex-direction:column;transition:border-color .15s,background .15s}
-    .kol.drag-over{border-color:var(--ac);background:rgba(88,166,255,0.04)}
-    .kol-hdr{padding:11px 14px;border-bottom:1px solid var(--bd);
-      display:flex;align-items:center;gap:7px;
-      background:var(--sf);border-radius:var(--r) var(--r) 0 0}
-    .kol-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .kol-name{font-weight:700;font-size:13px}
-    .kol-cnt{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--tx3)}
-    .kol-body{padding:9px;display:flex;flex-direction:column;gap:7px;flex:1}
-    .kol-empty{text-align:center;padding:20px 10px;color:var(--tx3);font-size:12px;
-      border:1.5px dashed var(--bd);border-radius:var(--rsm)}
-
-    /* Task card kanban */
-    .tcard{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rsm);
-      padding:10px 12px;cursor:grab;
-      transition:border-color .12s,transform .1s,opacity .1s;animation:fadeIn .18s ease}
-    .tcard:hover{border-color:var(--bd2)}
-    .tcard.dragging{opacity:.45;cursor:grabbing;transform:rotate(1.5deg) scale(1.02)}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
-
-    /* Task card list */
-    .tcard-list{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);
-      padding:14px 18px;animation:fadeIn .18s ease;transition:border-color .12s}
-    .tcard-list:hover{border-color:var(--bd2)}
-    .tcard-list-inner{display:flex;align-items:flex-start;gap:10px}
-    .status-bar{width:3px;border-radius:2px;align-self:stretch;flex-shrink:0}
-
-    .tc-title{font-size:13px;font-weight:600;color:var(--tx);margin-bottom:7px;line-height:1.4;word-break:break-word}
-    .tc-title.done-text{text-decoration:line-through;color:var(--tx3)}
-    .tc-title-lg{font-size:14px}
-    .tc-meta{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
-    .tc-desc{font-size:11px;color:var(--tx3);line-height:1.6;margin-top:5px;white-space:pre-wrap;word-break:break-word}
-
-    .tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
-    .tag-waiting {background:rgba(110,118,129,.15);color:#8b949e}
-    .tag-progress{background:rgba(88,166,255,.12); color:#58a6ff}
-    .tag-done    {background:rgba(63,185,80,.12);  color:#3fb950}
-    .tag-hold    {background:rgba(210,153,34,.12); color:#d29922}
-    .tag-low     {background:rgba(110,118,129,.1); color:#6e7681}
-    .tag-normal  {background:rgba(137,87,229,.1);  color:#a371f7}
-    .tag-high    {background:rgba(210,153,34,.1);  color:#d29922}
-    .tag-urgent  {background:rgba(248,81,73,.1);   color:#f85149}
-    .tag-person  {background:var(--sf3);color:var(--tx2)}
-    .tag-carried {background:rgba(88,166,255,.12);color:#79c0ff;font-size:10px}
-    .tag-no-assignee{background:rgba(248,81,73,.08);color:#f85149;font-size:10px}
-
-    .tc-actions{display:flex;gap:3px;margin-top:8px;justify-content:flex-end;opacity:0;transition:opacity .12s}
-    .tcard:hover .tc-actions,.tcard-list:hover .tc-actions{opacity:1}
-    .btn-ic{background:var(--sf3);border:none;color:var(--tx3);
-      width:24px;height:24px;border-radius:4px;cursor:pointer;
-      display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .12s}
-    .btn-ic:hover{color:var(--tx);background:var(--bd2)}
-    .btn-ic.del:hover{color:#f85149}
-
-    .list-view{display:flex;flex-direction:column;gap:8px}
-    .drag-hint{font-size:11px;color:var(--tx3);text-align:center;padding:4px 0 10px;letter-spacing:.3px}
-
-    .empty{text-align:center;padding:48px 20px;color:var(--tx3)}
-    .empty-icon{font-size:38px;margin-bottom:12px}
-    .empty-title{font-size:14px;font-weight:600;color:var(--tx2);margin-bottom:5px}
-    .empty-sub{font-size:13px}
-
-    /* Modal */
-    .overlay{position:fixed;inset:0;z-index:200;background:rgba(1,4,9,.75);backdrop-filter:blur(4px);
-      display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeOvr .15s ease}
-    @keyframes fadeOvr{from{opacity:0}to{opacity:1}}
-    .modal{background:var(--sf);border:1px solid var(--bd);border-radius:14px;
-      width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;animation:slideUp .18s ease}
-    @keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
-    .modal-hdr{padding:16px 20px 12px;border-bottom:1px solid var(--bd);
-      display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-    .modal-title{font-size:14px;font-weight:700}
-    .btn-close{background:none;border:none;color:var(--tx3);font-size:20px;cursor:pointer;padding:2px 5px;border-radius:4px;transition:color .12s}
-    .btn-close:hover{color:var(--tx)}
-    .modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:13px;overflow-y:auto}
-    .form-group{display:flex;flex-direction:column;gap:4px}
-    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-    label{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px}
-    .field{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);
-      border-radius:var(--rsm);padding:8px 11px;font-size:13px;
-      font-family:'Noto Sans KR',sans-serif;width:100%;outline:none;transition:border-color .12s}
-    .field:focus{border-color:var(--ac)}
-    .field::placeholder{color:var(--tx3)}
-    .field.error{border-color:#f85149}
-    select.field option{background:#21262d}
-    textarea.field{resize:vertical;min-height:72px;line-height:1.6}
-    .modal-ftr{padding:12px 20px 16px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:7px;flex-shrink:0}
-    .btn-cancel{background:none;border:1px solid var(--bd);color:var(--tx2);
-      padding:7px 14px;border-radius:var(--rsm);font-size:13px;
-      font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .12s}
-    .btn-cancel:hover{border-color:var(--bd2);color:var(--tx)}
-
-    /* Assignee popup */
-    .ap-modal{background:var(--sf);border:1px solid #f85149;border-radius:14px;
-      width:100%;max-width:360px;display:flex;flex-direction:column;animation:slideUp .18s ease}
-    .ap-body{padding:20px;display:flex;flex-direction:column;gap:14px}
-    .ap-warn{font-size:13px;color:var(--tx2);line-height:1.7}
-    .ap-warn strong{color:#f85149}
-    .ap-ftr{padding:0 20px 18px;display:flex;justify-content:flex-end;gap:7px}
-
-    /* Loading / Toast */
-    .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;color:var(--tx3);gap:13px}
-    .spinner{width:28px;height:28px;border:2px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .toast{position:fixed;bottom:18px;right:18px;z-index:999;background:var(--sf2);
-      border:1px solid var(--bd2);border-radius:var(--r);padding:10px 16px;font-size:13px;
-      display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastIn .18s ease}
-    @keyframes toastIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
-
-    @media(max-width:900px){.kanban{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:600px){
-      #hdr{padding:0 12px;gap:6px}
-      .logo span{display:none}
-      .input-search{width:120px}.input-search:focus{width:140px}
-      .kanban{grid-template-columns:1fr}
-      .stats{grid-template-columns:1fr 1fr}
-      #main-area{padding:12px}
-      .form-row{grid-template-columns:1fr}
-    }
-  </style>
-</head>
-<body>
-<div id="app">
-  <header id="hdr"></header>
-  <div id="week-nav"></div>
-  <nav id="filter-nav"></nav>
-  <div id="main-area">
-    <div class="loading"><div class="spinner"></div><span>로딩 중…</span></div>
-  </div>
-</div>
-
-<script>
-/* ══ Firebase ══ */
-const firebaseConfig = {
-  apiKey:            "AIzaSyBLjLVOVkNbAQcd3ZAMUepH6r7H0nf6-_A",
-  authDomain:        "financial-planning-group.firebaseapp.com",
-  databaseURL:       "https://financial-planning-group-default-rtdb.firebaseio.com",
-  projectId:         "financial-planning-group",
-  storageBucket:     "financial-planning-group.appspot.com",
-  messagingSenderId: "653273935773",
-  appId:             "1:653273935773:web:d71da1ca776af3bf76c974"
+const COLORS = {
+  navy: "#0F1C2E",
+  navyMid: "#1A2F4A",
+  navyLight: "#243B55",
+  amber: "#E8A020",
+  amberLight: "#FFC85A",
+  steel: "#4A6785",
+  steelLight: "#7A9BBF",
+  bg: "#F0F4F8",
+  bgCard: "#FFFFFF",
+  text: "#1A2332",
+  textMuted: "#5A6E84",
+  border: "#D4DCE6",
+  green: "#1A7A4A",
+  greenBg: "#E6F4ED",
+  red: "#C0392B",
+  redBg: "#FDECEA",
+  yellow: "#B8860B",
+  yellowBg: "#FEF9E7",
+  purple: "#6B3FA0",
+  purpleBg: "#F3EEF9",
 };
 
-const ASSIGNEES = ["홍혜란","정수지","박사준","이승환","이현용","이다원"];
+// ─── 초기 데이터 ─────────────────────────────────────────────────
 
-const STATUS = {
-  waiting:  {label:'대기중',color:'#8b949e',tagClass:'tag-waiting', dot:'#8b949e'},
-  progress: {label:'진행중',color:'#58a6ff',tagClass:'tag-progress',dot:'#58a6ff'},
-  done:     {label:'완료',  color:'#3fb950',tagClass:'tag-done',    dot:'#3fb950'},
-  hold:     {label:'보류',  color:'#d29922',tagClass:'tag-hold',    dot:'#d29922'},
+const INITIAL_NOTICES = [
+  {
+    id: 1, title: "2025년 하반기 재고실사 시행 공지",
+    date: "2025-11-01", author: "재경팀장", important: true,
+    content: `2025년 하반기 정기 재고실사를 아래와 같이 시행합니다.\n\n■ 실사 일정: 2025.11.15(토) ~ 11.16(일)\n■ 실사 대상: 반도체 부문 전 사업장 재고\n■ 수검반: 각 사업부 재경팀\n■ 조사반: 재경팀 감사지원TF\n\n실사 전 재고수불부 마감 및 시스템 입력 완료 바랍니다.`,
+  },
+  {
+    id: 2, title: "재고실사 절차 매뉴얼 배포",
+    date: "2025-11-03", author: "감사지원TF", important: false,
+    content: `재고실사 절차 매뉴얼(Rev.3)을 배포합니다.\n\n주요 개정 사항:\n- 샘플링 기준 업데이트 (금액 기준 상위 20% → 전수조사)\n- 결재 프로세스 전산화\n- 차이분석 양식 변경`,
+  },
+  {
+    id: 3, title: "[긴급] 화성캠퍼스 실사 일정 변경",
+    date: "2025-11-10", author: "재경팀", important: true,
+    content: `화성캠퍼스 라인 가동 일정 변경으로 인해 실사 일정이 조정됩니다.\n\n변경 전: 11.15(토) 09:00\n변경 후: 11.15(토) 14:00\n\n수검반 및 조사반 인원은 집결 시간에 유의하시기 바랍니다.`,
+  },
+];
+
+const DEPARTMENTS = ["DS부문 재경팀", "MX사업부 재경팀", "VD사업부 재경팀", "하만 재경팀", "감사지원TF"];
+
+const INITIAL_MEMBERS = [
+  { id: 1, name: "김재원", dept: "DS부문 재경팀", role: "수검반", site: "화성캠퍼스", phone: "010-1234-5678" },
+  { id: 2, name: "이수진", dept: "DS부문 재경팀", role: "수검반", site: "화성캠퍼스", phone: "010-2345-6789" },
+  { id: 3, name: "박민준", dept: "감사지원TF", role: "조사반", site: "화성캠퍼스", phone: "010-3456-7890" },
+  { id: 4, name: "최지현", dept: "감사지원TF", role: "조사반", site: "화성캠퍼스", phone: "010-4567-8901" },
+  { id: 5, name: "정다은", dept: "MX사업부 재경팀", role: "수검반", site: "수원캠퍼스", phone: "010-5678-9012" },
+  { id: 6, name: "한승호", dept: "감사지원TF", role: "조사반", site: "수원캠퍼스", phone: "010-6789-0123" },
+  { id: 7, name: "윤서연", dept: "VD사업부 재경팀", role: "수검반", site: "수원캠퍼스", phone: "010-7890-1234" },
+];
+
+const INITIAL_POPULATION = [
+  { id: "INV-001", name: "HBM3E 메모리 모듈", category: "반도체", location: "화성 F17", qty: 12500, unitCost: 320000, totalCost: 4000000000, sampled: false },
+  { id: "INV-002", name: "LPDDR5 칩셋", category: "반도체", location: "화성 F18", qty: 45000, unitCost: 85000, totalCost: 3825000000, sampled: false },
+  { id: "INV-003", name: "낸드플래시 256GB", category: "반도체", location: "평택 P3", qty: 78000, unitCost: 42000, totalCost: 3276000000, sampled: false },
+  { id: "INV-004", name: "시스템 온칩 엑시노스", category: "반도체", location: "화성 F16", qty: 5200, unitCost: 580000, totalCost: 3016000000, sampled: false },
+  { id: "INV-005", name: "OLED 패널 6.1인치", category: "디스플레이", location: "수원 DX1", qty: 32000, unitCost: 85000, totalCost: 2720000000, sampled: false },
+  { id: "INV-006", name: "DDR5 서버용 메모리", category: "반도체", location: "평택 P4", qty: 28000, unitCost: 95000, totalCost: 2660000000, sampled: false },
+  { id: "INV-007", name: "파워반도체 GaN", category: "반도체", location: "기흥 G2", qty: 15000, unitCost: 125000, totalCost: 1875000000, sampled: false },
+  { id: "INV-008", name: "이미지센서 200MP", category: "반도체", location: "기흥 G3", qty: 22000, unitCost: 78000, totalCost: 1716000000, sampled: false },
+  { id: "INV-009", name: "QLED TV 65인치 패널", category: "디스플레이", location: "수원 DX2", qty: 4800, unitCost: 320000, totalCost: 1536000000, sampled: false },
+  { id: "INV-010", name: "스마트폰 카메라모듈", category: "모듈", location: "수원 MX1", qty: 95000, unitCost: 15000, totalCost: 1425000000, sampled: false },
+  { id: "INV-011", name: "배터리 팩 5000mAh", category: "모듈", location: "수원 MX2", qty: 110000, unitCost: 12000, totalCost: 1320000000, sampled: false },
+  { id: "INV-012", name: "SSD 1TB M.2", category: "반도체", location: "평택 P2", qty: 38000, unitCost: 32000, totalCost: 1216000000, sampled: false },
+  { id: "INV-013", name: "무선충전 모듈", category: "모듈", location: "수원 MX3", qty: 75000, unitCost: 8500, totalCost: 637500000, sampled: false },
+  { id: "INV-014", name: "오디오 IC 칩", category: "반도체", location: "기흥 G1", qty: 180000, unitCost: 3200, totalCost: 576000000, sampled: false },
+  { id: "INV-015", name: "냉장고 컴프레서", category: "가전부품", location: "수원 HA1", qty: 8500, unitCost: 45000, totalCost: 382500000, sampled: false },
+];
+
+const fmt = (n) => n?.toLocaleString("ko-KR");
+const fmtKRW = (n) => {
+  if (n >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
+  if (n >= 1e4) return `${(n / 1e4).toFixed(0)}만`;
+  return n?.toLocaleString();
 };
-const PRIORITY = {
-  low:    {label:'낮음',tagClass:'tag-low'},
-  normal: {label:'보통',tagClass:'tag-normal'},
-  high:   {label:'높음',tagClass:'tag-high'},
-  urgent: {label:'긴급',tagClass:'tag-urgent'},
+
+// ─── 배지 컴포넌트 ────────────────────────────────────────────────
+const Badge = ({ children, color = "steel" }) => {
+  const map = {
+    steel: { bg: "#EBF1F7", color: COLORS.steel },
+    green: { bg: COLORS.greenBg, color: COLORS.green },
+    red: { bg: COLORS.redBg, color: COLORS.red },
+    amber: { bg: "#FEF3DC", color: COLORS.amber },
+    purple: { bg: COLORS.purpleBg, color: COLORS.purple },
+    navy: { bg: COLORS.navyLight, color: "#FFFFFF" },
+  };
+  const s = map[color] || map.steel;
+  return (
+    <span style={{
+      display: "inline-block", padding: "2px 10px", borderRadius: 3,
+      fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+      background: s.bg, color: s.color, textTransform: "uppercase",
+    }}>{children}</span>
+  );
 };
 
-/* ══ State ══ */
-let db=null, tasks={};
-let currentWeek, currentYear;
-let filterStatus='all', filterAssignee='all', searchQuery='';
-let editingId=null, dragTaskId=null;
+// ─── 탭 1: 공지사항 ───────────────────────────────────────────────
+const TabNotice = () => {
+  const [notices] = useState(INITIAL_NOTICES);
+  const [selected, setSelected] = useState(null);
 
-/* ══ Utils ══ */
-function getWeekNum(d){
-  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-  dt.setUTCDate(dt.getUTCDate()+4-(dt.getUTCDay()||7));
-  const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
-  return Math.ceil((((dt-ys)/86400000)+1)/7);
-}
-function weekLabel(w){return 'W'+String(w).padStart(2,'0')}
-function nextWeekLabel(wl){
-  const n=parseInt(wl.replace('W',''));
-  return weekLabel(n>=52?1:n+1);
-}
-function getWeekRange(w,y){
-  const s=new Date(y,0,1+(w-1)*7),dow=s.getDay();
-  const mon=new Date(s);mon.setDate(s.getDate()-(dow<=4?dow-1:dow-8));
-  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
-  const f=d=>`${d.getMonth()+1}/${d.getDate()}`;
-  return `${f(mon)} – ${f(sun)}`;
-}
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function toast(msg,icon='✓'){
-  document.querySelectorAll('.toast').forEach(e=>e.remove());
-  const el=document.createElement('div');
-  el.className='toast';el.innerHTML=`<span>${icon}</span><span>${msg}</span>`;
-  document.body.appendChild(el);setTimeout(()=>el.remove(),2800);
-}
-
-/* ══════════════════════════════════════════════
-   보류 ↔ 차주 대기중 연동 로직
-   ─ holdId: 보류 task의 Firebase key
-   ─ task.carriedTo  : 보류→차주 생성된 task의 key
-   ─ task.carriedFrom: 차주 task가 원본 보류 task의 key를 가짐
-══════════════════════════════════════════════ */
-
-/* 보류 → 차주 대기중 생성 */
-async function createLinkedTask(holdId){
-  const t=tasks[holdId];
-  if(!t||t.carriedTo) return; /* 이미 연결된 경우 스킵 */
-  const nwl=nextWeekLabel(t.week||weekLabel(currentWeek));
-  const newRef=db.ref('tasks').push();
-  const newId=newRef.key;
-  await newRef.set({
-    title:       t.title,
-    department:  t.department||'',
-    assignee:    t.assignee||'',
-    week:        nwl,
-    priority:    t.priority||'normal',
-    status:      'waiting',
-    description: t.description||'',
-    carriedFrom: holdId,        /* ← 차주 task가 원본 ID 저장 */
-    createdAt:   Date.now(),
-    updatedAt:   Date.now(),
-  });
-  /* 원본 보류 task에 차주 task ID 기록 */
-  await db.ref(`tasks/${holdId}`).update({carriedTo:newId,updatedAt:Date.now()});
-  toast('차주 대기중으로 자동 이월됐습니다','🔁');
-}
-
-/* 보류 task에 연결된 차주 task 삭제 */
-async function removeLinkedTask(holdId){
-  const t=tasks[holdId];
-  if(!t||!t.carriedTo) return;
-  await db.ref(`tasks/${t.carriedTo}`).remove();
-  await db.ref(`tasks/${holdId}`).update({carriedTo:null,updatedAt:Date.now()});
-}
-
-/* ══ setStatus: 핵심 상태 변경 함수 ══ */
-async function setStatus(id, newStatus){
-  const oldStatus=tasks[id]?.status;
-  if(oldStatus===newStatus) return;
-
-  /* 1) Firebase 상태 업데이트 */
-  await db.ref(`tasks/${id}`).update({status:newStatus,updatedAt:Date.now()});
-
-  /* 2) 보류로 변경 → 차주 대기중 생성 */
-  if(newStatus==='hold'){
-    await createLinkedTask(id);
-  }
-
-  /* 3) 보류에서 다른 상태로 변경 → 연결된 차주 task 삭제 */
-  if(oldStatus==='hold' && newStatus!=='hold'){
-    await removeLinkedTask(id);
-  }
-}
-
-/* ══ removeTask: 삭제 시 양방향 동기화 ══ */
-async function removeTask(id){
-  if(!confirm('이 업무를 삭제하시겠습니까?')) return;
-  const t=tasks[id];
-  if(!t) return;
-
-  try{
-    /* Case A: 보류 task 삭제 → 연결된 차주 대기중도 삭제 */
-    if(t.status==='hold' && t.carriedTo){
-      await db.ref(`tasks/${t.carriedTo}`).remove();
-      toast('보류 삭제 + 차주 이월 업무도 함께 삭제됐습니다','🗑');
-    }
-    /* Case B: 이월된 대기중 task 삭제 → 원본 보류 task도 삭제 */
-    else if(t.carriedFrom && tasks[t.carriedFrom]){
-      await db.ref(`tasks/${t.carriedFrom}`).remove();
-      toast('이월 업무 삭제 + 원본 보류 업무도 함께 삭제됐습니다','🗑');
-    } else {
-      toast('삭제됐습니다','🗑');
-    }
-    /* 본체 삭제 */
-    await db.ref(`tasks/${id}`).remove();
-  }catch(e){toast('삭제 오류: '+e.message,'⚠️');}
-}
-
-/* ══ Drag & Drop ══ */
-function onDragStart(e,id){
-  dragTaskId=id;e.dataTransfer.effectAllowed='move';
-  setTimeout(()=>{const el=document.getElementById(`tc-${id}`);if(el)el.classList.add('dragging');},0);
-}
-function onDragEnd(){document.querySelectorAll('.tcard.dragging').forEach(el=>el.classList.remove('dragging'));}
-function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
-function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
-async function onDrop(e,status){
-  e.preventDefault();e.currentTarget.classList.remove('drag-over');
-  if(!dragTaskId){return;}
-  const t=tasks[dragTaskId];
-  if(!t||t.status===status){dragTaskId=null;return;}
-  /* 진행중/완료: 담당자 필수 */
-  if((status==='progress'||status==='done')&&!t.assignee){
-    openAssigneePopup(dragTaskId,status);
-  } else {
-    await setStatus(dragTaskId,status);
-    if(status!=='hold') toast(`"${STATUS[status].label}"로 변경됐습니다`,'✅');
-  }
-  dragTaskId=null;
-}
-
-/* ══ 담당자 팝업 ══ */
-function openAssigneePopup(taskId,targetStatus){
-  document.getElementById('modal-overlay')?.remove();
-  const overlay=document.createElement('div');
-  overlay.className='overlay';overlay.id='modal-overlay';
-  overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
-  overlay.innerHTML=`
-    <div class="ap-modal" role="dialog">
-      <div class="modal-hdr">
-        <div class="modal-title">⚠️ 담당자 지정 필요</div>
-        <button class="btn-close" onclick="closeModal()">×</button>
-      </div>
-      <div class="ap-body">
-        <div class="ap-warn">
-          <strong>"${STATUS[targetStatus].label}"</strong> 상태로 변경하려면<br>
-          담당자를 먼저 지정해야 합니다.
+  return (
+    <div style={{ display: "flex", gap: 20, height: "100%" }}>
+      {/* 목록 */}
+      <div style={{ width: 340, flexShrink: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.textMuted, letterSpacing: "0.08em", marginBottom: 10 }}>
+          전체 {notices.length}건
         </div>
-        <div class="form-group">
-          <label for="ap-person">담당자 선택</label>
-          <select class="field" id="ap-person">
-            <option value="">담당자를 선택하세요</option>
-            ${ASSIGNEES.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="ap-ftr">
-        <button class="btn-cancel" onclick="closeModal()">취소</button>
-        <button class="btn-primary" onclick="confirmAssigneeAndStatus('${taskId}','${targetStatus}')">확인 후 변경</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  setTimeout(()=>document.getElementById('ap-person')?.focus(),50);
-}
-async function confirmAssigneeAndStatus(taskId,targetStatus){
-  const assignee=document.getElementById('ap-person').value;
-  if(!assignee){document.getElementById('ap-person').classList.add('error');toast('담당자를 선택해주세요','⚠️');return;}
-  try{
-    await db.ref(`tasks/${taskId}`).update({assignee,updatedAt:Date.now()});
-    /* tasks 메모리 즉시 반영 */
-    if(tasks[taskId]) tasks[taskId].assignee=assignee;
-    await setStatus(taskId,targetStatus);
-    toast(`담당자 지정 후 "${STATUS[targetStatus].label}"로 변경됐습니다`,'✅');
-    closeModal();
-  }catch(err){toast('오류: '+err.message,'⚠️');}
-}
-
-/* ══ Modal ══ */
-function openModal(id=null){
-  editingId=id;
-  const t=id?(tasks[id]||{}):{};
-  const wl=weekLabel(currentWeek);
-  const overlay=document.createElement('div');
-  overlay.className='overlay';overlay.id='modal-overlay';
-  overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
-  overlay.innerHTML=`
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-hdr">
-        <div class="modal-title">${id?'✏️ 업무 수정':'➕ 업무 추가'}</div>
-        <button class="btn-close" onclick="closeModal()">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label for="f-title">업무명 *</label>
-          <input class="field" id="f-title" type="text" placeholder="업무 내용을 입력하세요" value="${esc(t.title||'')}" />
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="f-dept">부서</label>
-            <input class="field" id="f-dept" type="text" placeholder="예: 기획팀" value="${esc(t.department||'')}" />
+        {notices.map((n) => (
+          <div key={n.id} onClick={() => setSelected(n)}
+            style={{
+              padding: "14px 16px", marginBottom: 8, borderRadius: 6,
+              border: `1.5px solid ${selected?.id === n.id ? COLORS.amber : COLORS.border}`,
+              background: selected?.id === n.id ? "#FFFBF0" : COLORS.bgCard,
+              cursor: "pointer", transition: "all 0.15s",
+            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              {n.important && <Badge color="red">긴급</Badge>}
+              <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.text }}>{n.title}</span>
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>
+              {n.author} · {n.date}
+            </div>
           </div>
-          <div class="form-group">
-            <label for="f-person">담당자</label>
-            <select class="field" id="f-person">
-              <option value="">담당자 선택 (선택사항)</option>
-              ${ASSIGNEES.map(a=>`<option value="${esc(a)}" ${(t.assignee||'')===a?'selected':''}>${esc(a)}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="f-week">주차</label>
-            <input class="field" id="f-week" type="text" placeholder="예: W22" value="${esc(t.week||wl)}" />
-          </div>
-          <div class="form-group">
-            <label for="f-priority">우선순위</label>
-            <select class="field" id="f-priority">
-              ${Object.entries(PRIORITY).map(([k,v])=>`<option value="${k}" ${(t.priority||'normal')===k?'selected':''}>${v.label}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="f-status">상태</label>
-          <select class="field" id="f-status">
-            ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${(t.status||'waiting')===k?'selected':''}>${v.label}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="f-desc">설명</label>
-          <textarea class="field" id="f-desc" placeholder="업무 상세 내용, 참고사항 등">${esc(t.description||'')}</textarea>
-        </div>
+        ))}
       </div>
-      <div class="modal-ftr">
-        <button class="btn-cancel" onclick="closeModal()">취소</button>
-        <button class="btn-primary" onclick="saveTask()">저장</button>
+
+      {/* 본문 */}
+      <div style={{ flex: 1, background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 28 }}>
+        {selected ? (
+          <>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+              {selected.important && <Badge color="red">긴급공지</Badge>}
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: COLORS.navy }}>{selected.title}</h2>
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${COLORS.border}` }}>
+              작성자: {selected.author} &nbsp;|&nbsp; 작성일: {selected.date}
+            </div>
+            <pre style={{ margin: 0, fontFamily: "inherit", fontSize: 14, lineHeight: 1.8, color: COLORS.text, whiteSpace: "pre-wrap" }}>
+              {selected.content}
+            </pre>
+          </>
+        ) : (
+          <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.textMuted, fontSize: 14 }}>
+            공지를 선택하여 내용을 확인하세요
+          </div>
+        )}
       </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  setTimeout(()=>document.getElementById('f-title')?.focus(),50);
-}
-function closeModal(){document.getElementById('modal-overlay')?.remove();editingId=null;}
-
-/* ══ saveTask ══ */
-async function saveTask(){
-  const titleEl=document.getElementById('f-title');
-  const title=titleEl.value.trim();
-  if(!title){titleEl.classList.add('error');titleEl.focus();return;}
-  const newStatus =document.getElementById('f-status').value;
-  const assignee  =document.getElementById('f-person').value;
-  if((newStatus==='progress'||newStatus==='done')&&!assignee){
-    document.getElementById('f-person').classList.add('error');
-    toast('진행중·완료 상태는 담당자를 지정해야 합니다','⚠️');return;
-  }
-  const weekVal=(document.getElementById('f-week').value.trim()||weekLabel(currentWeek)).toUpperCase();
-  const data={title,department:document.getElementById('f-dept').value.trim(),
-    assignee,week:weekVal,priority:document.getElementById('f-priority').value,
-    status:newStatus,description:document.getElementById('f-desc').value.trim(),updatedAt:Date.now()};
-  try{
-    if(editingId){
-      const oldStatus=tasks[editingId]?.status;
-      await db.ref(`tasks/${editingId}`).update(data);
-      /* 상태 변경에 따른 연동 처리 */
-      if(newStatus==='hold' && oldStatus!=='hold'){
-        /* tasks 메모리 즉시 반영 후 연동 생성 */
-        tasks[editingId]={...tasks[editingId],...data};
-        await createLinkedTask(editingId);
-      } else if(oldStatus==='hold' && newStatus!=='hold'){
-        tasks[editingId]={...tasks[editingId],...data};
-        await removeLinkedTask(editingId);
-      }
-      toast('업무가 수정됐습니다','✏️');
-    } else {
-      data.createdAt=Date.now();
-      const newRef=await db.ref('tasks').push(data);
-      /* 신규 등록 시 바로 보류면 차주 생성 */
-      if(newStatus==='hold'){
-        tasks[newRef.key]=data;
-        await createLinkedTask(newRef.key);
-      }
-      toast('업무가 추가됐습니다','✅');
-    }
-    closeModal();
-  }catch(e){toast('저장 오류: '+e.message,'⚠️');}
-}
-
-/* ══ Render: Header (딱 한 번) ══ */
-function renderHeader(){
-  document.getElementById('hdr').innerHTML=`
-    <div class="logo"><div class="logo-dot"></div><span>WeekTask</span></div>
-    <div class="hdr-right">
-      <input class="input-search" id="search-input" type="text"
-        placeholder="🔍 업무 검색" oninput="onSearch(this.value)" />
-      <select class="sel-hdr" onchange="setAssigneeFilter(this.value)">
-        <option value="all">전체 담당자</option>
-        ${ASSIGNEES.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('')}
-      </select>
-      <button class="btn-primary" onclick="openModal()">+ 업무 추가</button>
-    </div>`;
-}
-
-/* ══ Render Week Nav ══ */
-function renderWeekNav(){
-  const wl=weekLabel(currentWeek),range=getWeekRange(currentWeek,currentYear);
-  const isNow=currentWeek===getWeekNum(new Date())&&currentYear===new Date().getFullYear();
-  document.getElementById('week-nav').innerHTML=`
-    <div class="wn-ctrl">
-      <button class="btn-week" onclick="shiftWeek(-1)">‹</button>
-      <div><div class="week-lbl">${wl}</div><div class="week-sub">${currentYear}년 · ${range}</div></div>
-      <button class="btn-week" onclick="shiftWeek(1)">›</button>
     </div>
-    ${!isNow?`<button class="btn-today" onclick="goNow()">이번 주로</button>`:''}`;
-}
+  );
+};
 
-/* ══ Render Filter Nav ══ */
-function renderFilterNav(){
-  const wl=weekLabel(currentWeek);
-  const wt=Object.values(tasks).filter(t=>t.week===wl);
-  const c={all:wt.length,
-    waiting: wt.filter(t=>t.status==='waiting').length,
-    progress:wt.filter(t=>t.status==='progress').length,
-    done:    wt.filter(t=>t.status==='done').length,
-    hold:    wt.filter(t=>t.status==='hold').length};
-  const tabs=[['all','전체'],['waiting','대기중'],['progress','진행중'],['done','완료'],['hold','보류']];
-  document.getElementById('filter-nav').innerHTML=tabs.map(([k,l])=>`
-    <button class="ftab ${filterStatus===k?'active':''}" onclick="setFilter('${k}')">
-      ${l}<span class="chip">${c[k]}</span>
-    </button>`).join('');
-}
+// ─── 탭 2: 인원 현황 ─────────────────────────────────────────────
+const TabMembers = () => {
+  const [members, setMembers] = useState(INITIAL_MEMBERS);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: "", dept: DEPARTMENTS[0], role: "수검반", site: "화성캠퍼스", phone: "" });
+  const [filterRole, setFilterRole] = useState("전체");
 
-/* ══ Render Main ══ */
-function renderMain(){
-  const wl=weekLabel(currentWeek);
-  const allWeek=Object.entries(tasks).filter(([,t])=>t.week===wl);
-  let filtered=allWeek;
-  if(filterAssignee!=='all') filtered=filtered.filter(([,t])=>t.assignee===filterAssignee);
-  if(searchQuery) filtered=filtered.filter(([,t])=>(t.title||'').toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = filterRole === "전체" ? members : members.filter((m) => m.role === filterRole);
+  const byRole = { 수검반: members.filter(m => m.role === "수검반"), 조사반: members.filter(m => m.role === "조사반") };
 
-  /* Stats */
-  const total  =allWeek.length;
-  const waiting=allWeek.filter(([,t])=>t.status==='waiting').length;
-  const prog   =allWeek.filter(([,t])=>t.status==='progress').length;
-  const done   =allWeek.filter(([,t])=>t.status==='done').length;
-  const rate   =total?Math.round(done/total*100):0;
-  const rateColor=rate>=80?'#3fb950':rate>=40?'#d29922':'#e6edf3';
+  const addMember = () => {
+    if (!form.name) return;
+    setMembers([...members, { ...form, id: Date.now() }]);
+    setShowModal(false);
+    setForm({ name: "", dept: DEPARTMENTS[0], role: "수검반", site: "화성캠퍼스", phone: "" });
+  };
 
-  const statsHtml=`
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-label">대기중</div>
-        <div class="stat-val" style="color:#8b949e">${waiting}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">진행중</div>
-        <div class="stat-val" style="color:#58a6ff">${prog}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">완료</div>
-        <div class="stat-val" style="color:#3fb950">${done}</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">전체 업무</div>
-        <div class="stat-val" style="color:#e6edf3">${total}</div>
-        <div class="stat-sub" style="color:${rateColor}">완료율 ${rate}%</div>
-      </div>
-    </div>`;
+  const removeMember = (id) => setMembers(members.filter(m => m.id !== id));
 
-  let boardHtml='';
-  if(filterStatus==='all'){
-    boardHtml=`<div class="drag-hint">💡 카드를 드래그하여 다른 칸으로 옮기면 상태가 변경됩니다</div><div class="kanban">`;
-    for(const [sk,sv] of Object.entries(STATUS)){
-      const col=filtered.filter(([,t])=>t.status===sk).sort(([,a],[,b])=>(b.createdAt||0)-(a.createdAt||0));
-      boardHtml+=`
-        <div class="kol" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event,'${sk}')">
-          <div class="kol-hdr">
-            <div class="kol-dot" style="background:${sv.dot}"></div>
-            <div class="kol-name">${sv.label}</div>
-            <div class="kol-cnt">${col.length}</div>
+  return (
+    <div>
+      {/* 요약 카드 */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 24 }}>
+        {[
+          { label: "전체 인원", value: members.length, unit: "명", color: COLORS.navy },
+          { label: "수검반", value: byRole.수검반.length, unit: "명", color: COLORS.steel },
+          { label: "조사반", value: byRole.조사반.length, unit: "명", color: COLORS.amber },
+          { label: "사업장 수", value: [...new Set(members.map(m => m.site))].length, unit: "개소", color: COLORS.green },
+        ].map((s) => (
+          <div key={s.label} style={{
+            flex: 1, background: COLORS.bgCard, borderRadius: 8, padding: "16px 20px",
+            border: `1px solid ${COLORS.border}`, borderTop: `3px solid ${s.color}`,
+          }}>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontVariantNumeric: "tabular-nums" }}>
+              {s.value}<span style={{ fontSize: 13, fontWeight: 400, marginLeft: 4, color: COLORS.textMuted }}>{s.unit}</span>
+            </div>
           </div>
-          <div class="kol-body">
-            ${col.length===0
-              ?`<div class="kol-empty">여기로 드래그하세요</div>`
-              :col.map(([id,t])=>cardKanban(id,t)).join('')}
+        ))}
+      </div>
+
+      {/* 툴바 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        {["전체", "수검반", "조사반"].map((r) => (
+          <button key={r} onClick={() => setFilterRole(r)} style={{
+            padding: "6px 16px", borderRadius: 4, fontSize: 13, fontWeight: 600,
+            border: `1.5px solid ${filterRole === r ? COLORS.amber : COLORS.border}`,
+            background: filterRole === r ? "#FEF3DC" : COLORS.bgCard,
+            color: filterRole === r ? COLORS.amber : COLORS.textMuted, cursor: "pointer",
+          }}>{r}</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowModal(true)} style={{
+          padding: "8px 18px", borderRadius: 5, fontSize: 13, fontWeight: 700,
+          background: COLORS.navy, color: "#FFF", border: "none", cursor: "pointer",
+        }}>+ 인원 추가</button>
+      </div>
+
+      {/* 테이블 */}
+      <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: COLORS.navy }}>
+              {["성명", "소속", "역할", "담당 사업장", "연락처", "관리"].map((h) => (
+                <th key={h} style={{ padding: "11px 16px", textAlign: "left", color: "#B8C8DC", fontWeight: 700, fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((m, i) => (
+              <tr key={m.id} style={{ borderBottom: `1px solid ${COLORS.border}`, background: i % 2 === 0 ? COLORS.bgCard : "#F8FAFB" }}>
+                <td style={{ padding: "12px 16px", fontWeight: 600, color: COLORS.text }}>{m.name}</td>
+                <td style={{ padding: "12px 16px", color: COLORS.textMuted }}>{m.dept}</td>
+                <td style={{ padding: "12px 16px" }}><Badge color={m.role === "조사반" ? "amber" : "steel"}>{m.role}</Badge></td>
+                <td style={{ padding: "12px 16px", color: COLORS.text }}>{m.site}</td>
+                <td style={{ padding: "12px 16px", color: COLORS.textMuted, fontVariantNumeric: "tabular-nums" }}>{m.phone}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  <button onClick={() => removeMember(m.id)} style={{
+                    padding: "3px 10px", borderRadius: 3, fontSize: 11, fontWeight: 600,
+                    border: `1px solid ${COLORS.border}`, background: "transparent",
+                    color: COLORS.textMuted, cursor: "pointer",
+                  }}>삭제</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 모달 */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div style={{ background: COLORS.bgCard, borderRadius: 10, padding: 28, width: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700, color: COLORS.navy }}>인원 추가</h3>
+            {[
+              { label: "성명", key: "name", type: "text" },
+              { label: "연락처", key: "phone", type: "text" },
+            ].map(({ label, key, type }) => (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, marginBottom: 5 }}>{label}</label>
+                <input value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })} type={type}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 5, border: `1.5px solid ${COLORS.border}`, fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+            ))}
+            {[
+              { label: "소속", key: "dept", options: DEPARTMENTS },
+              { label: "역할", key: "role", options: ["수검반", "조사반"] },
+              { label: "사업장", key: "site", options: ["화성캠퍼스", "평택캠퍼스", "수원캠퍼스", "기흥캠퍼스"] },
+            ].map(({ label, key, options }) => (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, marginBottom: 5 }}>{label}</label>
+                <select value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 5, border: `1.5px solid ${COLORS.border}`, fontSize: 13 }}>
+                  {options.map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: "8px 18px", borderRadius: 5, border: `1px solid ${COLORS.border}`, background: "transparent", fontSize: 13, cursor: "pointer" }}>취소</button>
+              <button onClick={addMember} style={{ padding: "8px 20px", borderRadius: 5, background: COLORS.navy, color: "#FFF", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>추가</button>
+            </div>
           </div>
-        </div>`;
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── 탭 3: 모집단 & 샘플링 ────────────────────────────────────────
+const TabSampling = ({ population, setPopulation }) => {
+  const [method, setMethod] = useState("monetary"); // monetary | random | stratified
+  const [sampleRate, setSampleRate] = useState(20);
+  const [threshold, setThreshold] = useState(2000000000);
+
+  const totalPop = population.length;
+  const sampledCount = population.filter(p => p.sampled).length;
+  const totalValue = population.reduce((s, p) => s + p.totalCost, 0);
+  const sampledValue = population.filter(p => p.sampled).reduce((s, p) => s + p.totalCost, 0);
+
+  const runSampling = () => {
+    let updated = population.map(p => ({ ...p, sampled: false }));
+    if (method === "monetary") {
+      updated = updated.map(p => ({ ...p, sampled: p.totalCost >= threshold }));
+    } else if (method === "random") {
+      const n = Math.ceil(population.length * sampleRate / 100);
+      const indices = new Set();
+      while (indices.size < n) indices.add(Math.floor(Math.random() * population.length));
+      updated = updated.map((p, i) => ({ ...p, sampled: indices.has(i) }));
+    } else {
+      // stratified: 카테고리별 비례
+      const cats = [...new Set(population.map(p => p.category))];
+      const selected = new Set();
+      cats.forEach(cat => {
+        const items = population.filter(p => p.category === cat);
+        const n = Math.max(1, Math.ceil(items.length * sampleRate / 100));
+        items.slice(0, n).forEach(p => selected.add(p.id));
+      });
+      updated = updated.map(p => ({ ...p, sampled: selected.has(p.id) }));
     }
-    boardHtml+=`</div>`;
-  } else {
-    const items=filtered.filter(([,t])=>t.status===filterStatus).sort(([,a],[,b])=>(b.createdAt||0)-(a.createdAt||0));
-    boardHtml=items.length===0
-      ?`<div class="empty"><div class="empty-icon">📋</div>
-         <div class="empty-title">${wl} · ${STATUS[filterStatus]?.label} 업무가 없습니다</div>
-         <div class="empty-sub">+ 업무 추가 버튼으로 등록해보세요</div></div>`
-      :`<div class="list-view">${items.map(([id,t])=>cardList(id,t)).join('')}</div>`;
-  }
-  document.getElementById('main-area').innerHTML=statsHtml+boardHtml;
-}
+    setPopulation(updated);
+  };
 
-function renderAll(){renderWeekNav();renderFilterNav();renderMain();}
+  const clearSampling = () => setPopulation(population.map(p => ({ ...p, sampled: false })));
 
-/* ══ Cards ══ */
-function cardKanban(id,t){
-  const pr=PRIORITY[t.priority]||PRIORITY.normal;
-  return `
-    <div class="tcard" id="tc-${id}" draggable="true"
-      ondragstart="onDragStart(event,'${id}')" ondragend="onDragEnd(event)">
-      <div class="tc-title ${t.status==='done'?'done-text':''}">${esc(t.title)}</div>
-      <div class="tc-meta">
-        <span class="tag ${pr.tagClass}">${pr.label}</span>
-        ${t.assignee
-          ?`<span class="tag tag-person">👤 ${esc(t.assignee)}</span>`
-          :`<span class="tag tag-no-assignee">⚠ 담당자 없음</span>`}
-        ${t.carriedFrom?`<span class="tag tag-carried">↩ 이월</span>`:''}
-        ${t.carriedTo  ?`<span class="tag tag-carried">🔁 이월됨</span>`:''}
-      </div>
-      ${t.description?`<div class="tc-desc">${esc(t.description)}</div>`:''}
-      <div class="tc-actions">
-        <button class="btn-ic" onclick="openModal('${id}')">✏️</button>
-        <button class="btn-ic del" onclick="removeTask('${id}')">🗑</button>
-      </div>
-    </div>`;
-}
-function cardList(id,t){
-  const st=STATUS[t.status]||STATUS.waiting;
-  const pr=PRIORITY[t.priority]||PRIORITY.normal;
-  return `
-    <div class="tcard-list" id="tc-${id}">
-      <div class="tcard-list-inner">
-        <div class="status-bar" style="background:${st.color}"></div>
-        <div style="flex:1;min-width:0">
-          <div class="tc-title tc-title-lg ${t.status==='done'?'done-text':''}">${esc(t.title)}</div>
-          <div class="tc-meta">
-            <span class="tag ${st.tagClass}">${st.label}</span>
-            <span class="tag ${pr.tagClass}">${pr.label}</span>
-            ${t.assignee
-              ?`<span class="tag tag-person">👤 ${esc(t.assignee)}</span>`
-              :`<span class="tag tag-no-assignee">⚠ 담당자 없음</span>`}
-            ${t.carriedFrom?`<span class="tag tag-carried">↩ 이월</span>`:''}
-            ${t.carriedTo  ?`<span class="tag tag-carried">🔁 이월됨</span>`:''}
+  return (
+    <div>
+      {/* 통계 카드 */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
+        {[
+          { label: "전체 모집단", value: fmt(totalPop), unit: "건", color: COLORS.navy },
+          { label: "샘플 선정", value: fmt(sampledCount), unit: "건", color: COLORS.amber },
+          { label: "전체 장부가", value: fmtKRW(totalValue), unit: "원", color: COLORS.steel },
+          { label: "샘플 장부가", value: fmtKRW(sampledValue), unit: "원", color: COLORS.green },
+        ].map((s) => (
+          <div key={s.label} style={{ flex: 1, background: COLORS.bgCard, borderRadius: 8, padding: "16px 20px", border: `1px solid ${COLORS.border}`, borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontVariantNumeric: "tabular-nums" }}>
+              {s.value}<span style={{ fontSize: 12, fontWeight: 400, marginLeft: 4, color: COLORS.textMuted }}>{s.unit}</span>
+            </div>
+            {s.label === "샘플 선정" && totalPop > 0 && (
+              <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 3 }}>
+                커버리지 {(sampledCount / totalPop * 100).toFixed(0)}%
+              </div>
+            )}
           </div>
-          ${t.description?`<div class="tc-desc">${esc(t.description)}</div>`:''}
+        ))}
+      </div>
+
+      {/* 샘플링 설정 패널 */}
+      <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 20, marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.navy, marginBottom: 14, letterSpacing: "0.05em" }}>샘플링 방법 설정</div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          {[
+            { val: "monetary", label: "금액 기준 (MUS)" },
+            { val: "random", label: "무작위 추출" },
+            { val: "stratified", label: "층화 추출" },
+          ].map(m => (
+            <button key={m.val} onClick={() => setMethod(m.val)} style={{
+              padding: "7px 16px", borderRadius: 5, fontSize: 12, fontWeight: 600,
+              border: `1.5px solid ${method === m.val ? COLORS.navy : COLORS.border}`,
+              background: method === m.val ? COLORS.navy : "transparent",
+              color: method === m.val ? "#FFF" : COLORS.textMuted, cursor: "pointer",
+            }}>{m.label}</button>
+          ))}
         </div>
-        <div class="tc-actions" style="opacity:1;flex-shrink:0">
-          <button class="btn-ic" onclick="openModal('${id}')">✏️</button>
-          <button class="btn-ic del" onclick="removeTask('${id}')">🗑</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {method === "monetary" ? (
+            <>
+              <label style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600 }}>기준 금액 (장부가 이상 전수조사)</label>
+              <input type="number" value={threshold} onChange={e => setThreshold(Number(e.target.value))}
+                style={{ width: 160, padding: "7px 10px", borderRadius: 4, border: `1.5px solid ${COLORS.border}`, fontSize: 13, fontVariantNumeric: "tabular-nums" }} />
+              <span style={{ fontSize: 12, color: COLORS.textMuted }}>원 이상</span>
+            </>
+          ) : (
+            <>
+              <label style={{ fontSize: 12, color: COLORS.textMuted, fontWeight: 600 }}>샘플링 비율</label>
+              <input type="range" min={5} max={100} value={sampleRate} onChange={e => setSampleRate(Number(e.target.value))}
+                style={{ width: 120 }} />
+              <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, fontVariantNumeric: "tabular-nums", minWidth: 40 }}>{sampleRate}%</span>
+            </>
+          )}
+          <button onClick={runSampling} style={{
+            marginLeft: "auto", padding: "8px 20px", borderRadius: 5, background: COLORS.amber,
+            color: "#FFF", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          }}>샘플 추출</button>
+          <button onClick={clearSampling} style={{
+            padding: "8px 16px", borderRadius: 5, background: "transparent",
+            border: `1px solid ${COLORS.border}`, color: COLORS.textMuted, fontSize: 13, cursor: "pointer",
+          }}>초기화</button>
         </div>
       </div>
-    </div>`;
-}
 
-/* ══ Navigation ══ */
-function shiftWeek(d){
-  currentWeek+=d;
-  if(currentWeek<1){currentWeek=52;currentYear--;}
-  if(currentWeek>52){currentWeek=1;currentYear++;}
-  renderAll();
-}
-function goNow(){const n=new Date();currentWeek=getWeekNum(n);currentYear=n.getFullYear();renderAll();}
-function setFilter(s){filterStatus=s;renderFilterNav();renderMain();}
-function setAssigneeFilter(v){filterAssignee=v;renderMain();}
-function onSearch(val){searchQuery=val;renderMain();}
+      {/* 모집단 테이블 */}
+      <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: COLORS.navyMid }}>
+              {["샘플", "품목코드", "품명", "카테고리", "보관위치", "수량", "단가", "장부가"].map(h => (
+                <th key={h} style={{ padding: "10px 14px", textAlign: h === "수량" || h === "단가" || h === "장부가" ? "right" : "left", color: "#B8C8DC", fontWeight: 700, fontSize: 11, letterSpacing: "0.05em" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {population.map((item, i) => (
+              <tr key={item.id} style={{
+                borderBottom: `1px solid ${COLORS.border}`,
+                background: item.sampled ? "#FFFBF0" : (i % 2 === 0 ? COLORS.bgCard : "#F8FAFB"),
+              }}>
+                <td style={{ padding: "10px 14px" }}>
+                  {item.sampled ? (
+                    <span style={{ display: "inline-block", width: 20, height: 20, background: COLORS.amber, borderRadius: "50%", fontSize: 10, color: "#FFF", textAlign: "center", lineHeight: "20px", fontWeight: 700 }}>✓</span>
+                  ) : (
+                    <span style={{ display: "inline-block", width: 20, height: 20, border: `2px solid ${COLORS.border}`, borderRadius: "50%" }} />
+                  )}
+                </td>
+                <td style={{ padding: "10px 14px", color: COLORS.steel, fontFamily: "monospace", fontSize: 11 }}>{item.id}</td>
+                <td style={{ padding: "10px 14px", fontWeight: 500, color: COLORS.text }}>{item.name}</td>
+                <td style={{ padding: "10px 14px" }}><Badge>{item.category}</Badge></td>
+                <td style={{ padding: "10px 14px", color: COLORS.textMuted }}>{item.location}</td>
+                <td style={{ padding: "10px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(item.qty)}</td>
+                <td style={{ padding: "10px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: COLORS.textMuted }}>{fmt(item.unitCost)}</td>
+                <td style={{ padding: "10px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600, color: COLORS.navy }}>{fmtKRW(item.totalCost)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
 
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') closeModal();
-  if(e.key==='Enter'&&e.ctrlKey&&document.getElementById('modal-overlay')) saveTask();
-});
+// ─── 탭 4: 실사 결과 입력 ─────────────────────────────────────────
+const TabInput = ({ population }) => {
+  const sampledItems = population.filter(p => p.sampled);
+  const [results, setResults] = useState({});
+  const [approvals, setApprovals] = useState({});
 
-/* ══ Init ══ */
-(function init(){
-  const now=new Date();
-  currentWeek=getWeekNum(now);currentYear=now.getFullYear();
-  renderHeader();
-  try{
-    firebase.initializeApp(firebaseConfig);
-    db=firebase.database();
-    db.ref('tasks').on('value',snap=>{
-      tasks=snap.val()||{};
-      renderAll();
-    },err=>{
-      document.getElementById('main-area').innerHTML=`
-        <div class="loading" style="color:#f85149">
-          <span style="font-size:36px">⚠️</span>
-          <span>Firebase 오류: ${esc(err.message)}</span>
-        </div>`;
-    });
-  }catch(e){
-    document.getElementById('main-area').innerHTML=`
-      <div class="loading" style="color:#f85149">
-        <span style="font-size:36px">⚠️</span><span>${esc(e.message)}</span>
-      </div>`;
+  const getResult = (id) => results[id] || { countedQty: "", note: "", submitted: false };
+  const updateResult = (id, key, val) => setResults(prev => ({ ...prev, [id]: { ...getResult(id), [key]: val } }));
+
+  const submitItem = (id) => {
+    const r = getResult(id);
+    if (r.countedQty === "") return;
+    setResults(prev => ({ ...prev, [id]: { ...r, submitted: true } }));
+    setApprovals(prev => ({ ...prev, [id]: "pending" }));
+  };
+
+  const approveItem = (id, decision) => setApprovals(prev => ({ ...prev, [id]: decision }));
+
+  const submittedCount = Object.values(results).filter(r => r.submitted).length;
+  const approvedCount = Object.values(approvals).filter(a => a === "approved").length;
+
+  if (sampledItems.length === 0) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 300, flexDirection: "column", gap: 12 }}>
+        <div style={{ fontSize: 40 }}>📋</div>
+        <div style={{ fontSize: 15, color: COLORS.textMuted, fontWeight: 600 }}>샘플링된 품목이 없습니다</div>
+        <div style={{ fontSize: 13, color: COLORS.textMuted }}>먼저 [모집단 & 샘플링] 탭에서 샘플을 추출하세요</div>
+      </div>
+    );
   }
-})();
-</script>
-</body>
-</html>
+
+  return (
+    <div>
+      {/* 진행 상황 */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 20 }}>
+        {[
+          { label: "샘플 총계", value: sampledItems.length, color: COLORS.navy },
+          { label: "입력 완료", value: submittedCount, color: COLORS.amber },
+          { label: "결재 완료", value: approvedCount, color: COLORS.green },
+          { label: "미입력", value: sampledItems.length - submittedCount, color: COLORS.red },
+        ].map(s => (
+          <div key={s.label} style={{ flex: 1, background: COLORS.bgCard, borderRadius: 8, padding: "14px 18px", border: `1px solid ${COLORS.border}`, borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 700, marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: s.color, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 진행 바 */}
+      <div style={{ background: COLORS.bgCard, borderRadius: 8, padding: "14px 20px", border: `1px solid ${COLORS.border}`, marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: COLORS.textMuted, marginBottom: 6 }}>
+          <span>전체 진행률</span>
+          <span style={{ fontWeight: 700, color: COLORS.navy }}>
+            {sampledItems.length ? Math.round(approvedCount / sampledItems.length * 100) : 0}%
+          </span>
+        </div>
+        <div style={{ height: 8, background: COLORS.border, borderRadius: 4, overflow: "hidden" }}>
+          <div style={{
+            height: "100%", borderRadius: 4, background: `linear-gradient(90deg, ${COLORS.amber}, ${COLORS.green})`,
+            width: `${sampledItems.length ? approvedCount / sampledItems.length * 100 : 0}%`,
+            transition: "width 0.4s ease",
+          }} />
+        </div>
+      </div>
+
+      {/* 품목 카드 */}
+      <div style={{ display: "grid", gap: 12 }}>
+        {sampledItems.map(item => {
+          const r = getResult(item.id);
+          const approval = approvals[item.id];
+          const diff = r.submitted && r.countedQty !== "" ? Number(r.countedQty) - item.qty : null;
+          const diffPct = diff !== null && item.qty ? (diff / item.qty * 100).toFixed(1) : null;
+
+          return (
+            <div key={item.id} style={{
+              background: COLORS.bgCard, borderRadius: 8, border: `1.5px solid ${approval === "approved" ? COLORS.green : approval === "rejected" ? COLORS.red : r.submitted ? COLORS.amber : COLORS.border}`,
+              padding: 18, transition: "border-color 0.2s",
+            }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                {/* 품목 정보 */}
+                <div style={{ flex: "0 0 280px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 11, color: COLORS.steel }}>{item.id}</span>
+                    <Badge>{item.category}</Badge>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, marginBottom: 4 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: COLORS.textMuted }}>{item.location}</div>
+                  <div style={{ fontSize: 13, color: COLORS.text, marginTop: 6, fontVariantNumeric: "tabular-nums" }}>
+                    장부 수량: <strong>{fmt(item.qty)}</strong>
+                  </div>
+                </div>
+
+                {/* 입력 영역 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, marginBottom: 5 }}>실사 수량 (카운팅)</label>
+                      <input
+                        type="number" value={r.countedQty}
+                        onChange={e => updateResult(item.id, "countedQty", e.target.value)}
+                        disabled={r.submitted}
+                        placeholder="0"
+                        style={{
+                          width: 120, padding: "8px 12px", borderRadius: 5,
+                          border: `1.5px solid ${COLORS.border}`, fontSize: 14,
+                          fontVariantNumeric: "tabular-nums", fontWeight: 600,
+                          background: r.submitted ? "#F5F7FA" : "#FFF",
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: COLORS.textMuted, marginBottom: 5 }}>비고</label>
+                      <input
+                        type="text" value={r.note}
+                        onChange={e => updateResult(item.id, "note", e.target.value)}
+                        disabled={r.submitted}
+                        placeholder="특이사항 입력"
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 5, border: `1.5px solid ${COLORS.border}`, fontSize: 13, boxSizing: "border-box", background: r.submitted ? "#F5F7FA" : "#FFF" }}
+                      />
+                    </div>
+                    {!r.submitted ? (
+                      <button onClick={() => submitItem(item.id)} style={{
+                        padding: "8px 16px", borderRadius: 5, background: COLORS.navy,
+                        color: "#FFF", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                      }}>결재 요청</button>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {approval !== "approved" && approval !== "rejected" && (
+                          <>
+                            <button onClick={() => approveItem(item.id, "approved")} style={{ padding: "8px 14px", borderRadius: 5, background: COLORS.green, color: "#FFF", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>승인</button>
+                            <button onClick={() => approveItem(item.id, "rejected")} style={{ padding: "8px 14px", borderRadius: 5, background: COLORS.red, color: "#FFF", border: "none", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>반려</button>
+                          </>
+                        )}
+                        {approval === "approved" && <Badge color="green">결재완료</Badge>}
+                        {approval === "rejected" && <Badge color="red">반려</Badge>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 차이 표시 */}
+                {diff !== null && (
+                  <div style={{
+                    flex: "0 0 120px", textAlign: "right", padding: "8px 0",
+                  }}>
+                    <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 700, marginBottom: 4 }}>차이 (실사 - 장부)</div>
+                    <div style={{
+                      fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                      color: diff === 0 ? COLORS.green : diff > 0 ? COLORS.steel : COLORS.red,
+                    }}>
+                      {diff > 0 ? "+" : ""}{fmt(diff)}
+                    </div>
+                    <div style={{ fontSize: 11, color: diff === 0 ? COLORS.green : COLORS.red, fontWeight: 600 }}>
+                      {diffPct}%
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─── 탭 5: 결과 현황 ─────────────────────────────────────────────
+const TabResults = ({ population }) => {
+  const sampledItems = population.filter(p => p.sampled);
+  const total = population.length;
+  const sampled = sampledItems.length;
+  const totalVal = population.reduce((s, p) => s + p.totalCost, 0);
+  const sampledVal = sampledItems.reduce((s, p) => s + p.totalCost, 0);
+
+  const byCat = useMemo(() => {
+    const map = {};
+    population.forEach(p => {
+      if (!map[p.category]) map[p.category] = { total: 0, sampled: 0, value: 0 };
+      map[p.category].total++;
+      map[p.category].value += p.totalCost;
+      if (p.sampled) map[p.category].sampled++;
+    });
+    return Object.entries(map).sort((a, b) => b[1].value - a[1].value);
+  }, [population]);
+
+  const byLocation = useMemo(() => {
+    const map = {};
+    population.forEach(p => {
+      const loc = p.location.split(" ")[0];
+      if (!map[loc]) map[loc] = { total: 0, sampled: 0 };
+      map[loc].total++;
+      if (p.sampled) map[loc].sampled++;
+    });
+    return Object.entries(map);
+  }, [population]);
+
+  return (
+    <div>
+      {/* 핵심 지표 */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 24 }}>
+        {[
+          { label: "모집단 규모", value: fmt(total), unit: "건", sub: `${fmtKRW(totalVal)}원`, color: COLORS.navy },
+          { label: "샘플 선정", value: fmt(sampled), unit: "건", sub: `${sampled ? (sampled / total * 100).toFixed(0) : 0}% 커버리지`, color: COLORS.amber },
+          { label: "샘플 장부가 합계", value: fmtKRW(sampledVal), unit: "원", sub: `전체의 ${totalVal ? (sampledVal / totalVal * 100).toFixed(0) : 0}%`, color: COLORS.steel },
+        ].map(s => (
+          <div key={s.label} style={{ flex: 1, background: COLORS.bgCard, borderRadius: 8, padding: "18px 22px", border: `1px solid ${COLORS.border}`, borderTop: `3px solid ${s.color}` }}>
+            <div style={{ fontSize: 11, color: COLORS.textMuted, fontWeight: 700, marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: s.color, fontVariantNumeric: "tabular-nums" }}>
+              {s.value}<span style={{ fontSize: 12, fontWeight: 400, color: COLORS.textMuted, marginLeft: 4 }}>{s.unit}</span>
+            </div>
+            <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        {/* 카테고리별 */}
+        <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.navy, marginBottom: 16, letterSpacing: "0.05em" }}>카테고리별 샘플링 현황</div>
+          {byCat.map(([cat, d]) => (
+            <div key={cat} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+                <span style={{ fontWeight: 600, color: COLORS.text }}>{cat}</span>
+                <span style={{ color: COLORS.textMuted, fontVariantNumeric: "tabular-nums" }}>
+                  {d.sampled}/{d.total}건 · {fmtKRW(d.value)}원
+                </span>
+              </div>
+              <div style={{ height: 6, background: COLORS.border, borderRadius: 3, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", background: COLORS.amber, borderRadius: 3,
+                  width: `${d.total ? d.sampled / d.total * 100 : 0}%`, transition: "width 0.4s",
+                }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 사업장별 */}
+        <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.navy, marginBottom: 16, letterSpacing: "0.05em" }}>사업장별 샘플링 현황</div>
+          {byLocation.map(([loc, d]) => (
+            <div key={loc} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ flex: "0 0 80px", fontSize: 13, fontWeight: 600, color: COLORS.text }}>{loc}</div>
+              <div style={{ flex: 1, height: 20, background: COLORS.border, borderRadius: 3, overflow: "hidden", position: "relative" }}>
+                <div style={{
+                  height: "100%", background: `linear-gradient(90deg, ${COLORS.navyLight}, ${COLORS.steelLight})`,
+                  width: `${d.total ? d.sampled / d.total * 100 : 0}%`, borderRadius: 3, transition: "width 0.4s",
+                }} />
+              </div>
+              <div style={{ flex: "0 0 70px", textAlign: "right", fontSize: 12, color: COLORS.textMuted, fontVariantNumeric: "tabular-nums" }}>
+                {d.sampled}/{d.total}건
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 상세 모집단 요약 테이블 */}
+      <div style={{ background: COLORS.bgCard, borderRadius: 8, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+        <div style={{ padding: "14px 20px", borderBottom: `1px solid ${COLORS.border}`, fontSize: 12, fontWeight: 700, color: COLORS.navy }}>
+          전체 모집단 요약
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#F3F6FA" }}>
+              {["품목코드", "품명", "카테고리", "보관위치", "장부 수량", "장부가", "샘플 여부"].map(h => (
+                <th key={h} style={{ padding: "9px 14px", textAlign: h.includes("수량") || h.includes("장부가") ? "right" : "left", color: COLORS.textMuted, fontWeight: 700, fontSize: 11 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {population.map((item, i) => (
+              <tr key={item.id} style={{ borderBottom: `1px solid ${COLORS.border}`, background: item.sampled ? "#FFFBF0" : (i % 2 === 0 ? "#FFF" : "#F8FAFB") }}>
+                <td style={{ padding: "9px 14px", fontFamily: "monospace", fontSize: 11, color: COLORS.steel }}>{item.id}</td>
+                <td style={{ padding: "9px 14px", fontWeight: 500 }}>{item.name}</td>
+                <td style={{ padding: "9px 14px" }}><Badge>{item.category}</Badge></td>
+                <td style={{ padding: "9px 14px", color: COLORS.textMuted }}>{item.location}</td>
+                <td style={{ padding: "9px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(item.qty)}</td>
+                <td style={{ padding: "9px 14px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>{fmtKRW(item.totalCost)}</td>
+                <td style={{ padding: "9px 14px" }}>
+                  {item.sampled ? <Badge color="amber">샘플</Badge> : <span style={{ color: COLORS.border, fontSize: 11 }}>—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ─── 메인 앱 ─────────────────────────────────────────────────────
+export default function App() {
+  const [activeTab, setActiveTab] = useState(0);
+  const [population, setPopulation] = useState(INITIAL_POPULATION);
+
+  const tabs = [
+    { label: "공지사항", icon: "📢" },
+    { label: "인원 현황", icon: "👥" },
+    { label: "모집단 & 샘플링", icon: "🎯" },
+    { label: "결과 입력 / 결재", icon: "✏️" },
+    { label: "전체 결과 현황", icon: "📊" },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: COLORS.bg, fontFamily: "'Pretendard', 'Noto Sans KR', -apple-system, sans-serif" }}>
+      {/* 헤더 */}
+      <div style={{ background: COLORS.navy, padding: "0 32px", boxShadow: "0 2px 12px rgba(0,0,0,0.25)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 56 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 32, height: 32, background: COLORS.amber, borderRadius: 6,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 16, fontWeight: 900, color: COLORS.navy,
+            }}>재</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#FFF", letterSpacing: "-0.01em" }}>재고실사 통합관리시스템</div>
+              <div style={{ fontSize: 10, color: COLORS.steelLight, letterSpacing: "0.06em", marginTop: 1 }}>INVENTORY AUDIT MANAGEMENT · 재경팀</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Badge color="amber">2025 하반기 실사 진행중</Badge>
+            <div style={{ fontSize: 11, color: COLORS.steelLight }}>D-5</div>
+          </div>
+        </div>
+
+        {/* 탭 네비게이션 */}
+        <div style={{ display: "flex", gap: 0 }}>
+          {tabs.map((t, i) => (
+            <button key={i} onClick={() => setActiveTab(i)} style={{
+              padding: "12px 20px", background: "transparent", border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: activeTab === i ? 700 : 500,
+              color: activeTab === i ? COLORS.amberLight : COLORS.steelLight,
+              borderBottom: activeTab === i ? `2.5px solid ${COLORS.amber}` : "2.5px solid transparent",
+              transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ fontSize: 14 }}>{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 컨텐츠 */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px" }}>
+        {activeTab === 0 && <TabNotice />}
+        {activeTab === 1 && <TabMembers />}
+        {activeTab === 2 && <TabSampling population={population} setPopulation={setPopulation} />}
+        {activeTab === 3 && <TabInput population={population} />}
+        {activeTab === 4 && <TabResults population={population} />}
+      </div>
+    </div>
+  );
+}
