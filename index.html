@@ -637,64 +637,60 @@ async function dartGet(endpoint, params) {
   return data;
 }
 
-// ── 전체 기업 목록 (ZIP → XML 파싱, 세션 캐시) ──
-let corpListCache = null;
+// ── 기업 검색 캐시 ──
+const searchCache = {};
 
-async function loadCorpList() {
-  if (corpListCache) return corpListCache;
-
-  // 서버(Vercel)에서 ZIP 파싱 후 JSON으로 내려줌
-  const res = await fetch('/api/dart?endpoint=corpCode.xml');
-  if (!res.ok) throw new Error('기업 목록 로드 실패: ' + res.status);
-  const data = await res.json();
-  if (!data.list) throw new Error('기업 목록 형식 오류');
-
-  corpListCache = data.list;
-  return data.list;
-}
-
-// ── Corp Search (ZIP 기반 포함 검색) ──
+// ── Corp Search (/list.json 기반) ──
 async function searchCorp() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) return;
 
   const listEl = document.getElementById('corpList');
-  listEl.innerHTML = '<div class="loading"><div class="spinner"></div> 기업 목록 로딩 중…</div>';
+  listEl.innerHTML = '<div class="loading"><div class="spinner"></div> 검색 중…</div>';
 
   try {
-    const corps = await loadCorpList();
+    // 캐시 확인
+    if (searchCache[q]) { renderCorpList(searchCache[q], q, listEl); return; }
 
-    const qLower = q.toLowerCase();
-    const matched = corps.filter(c =>
-      c.corp_name.toLowerCase().includes(qLower) ||
-      (c.stock_code && c.stock_code.includes(q))
-    );
-
-    if (!matched.length) {
-      listEl.innerHTML = '<div class="empty-state" style="padding:16px;font-size:12px">검색 결과가 없습니다.</div>';
-      return;
-    }
-
-    // 상장사 우선 정렬
-    matched.sort((a,b) => {
-      const aS = a.stock_code ? 1 : 0;
-      const bS = b.stock_code ? 1 : 0;
-      return bS - aS;
+    // 최근 5년 공시에서 corp_name 포함 검색 → 회사 목록 추출
+    const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const data = await dartGet('/list.json', {
+      corp_name: q,
+      bgn_de: '20200101',
+      end_de: today,
+      page_count: '100',
     });
 
-    listEl.innerHTML = matched.slice(0,30).map(c => `
-      <div class="corp-item" onclick="selectCorp('${c.corp_code}','${escHtml(c.corp_name)}','${c.stock_code||''}','')">
-        <span class="corp-name">${highlight(escHtml(c.corp_name), q)}</span>
-        <span class="corp-meta">
-          ${c.stock_code ? '📈 ' + c.stock_code : '비상장'} &nbsp;·&nbsp; ${c.corp_code}
-        </span>
-      </div>
-    `).join('') + (matched.length > 30 ? `<div style="padding:8px 12px;font-size:11px;color:var(--text-dim)">외 ${matched.length-30}개 — 더 구체적으로 검색해보세요</div>` : '');
+    const list = data.list || [];
+    // 중복 제거, corp_code 기준
+    const seen = new Set();
+    const corps = list
+      .filter(r => { if (seen.has(r.corp_code)) return false; seen.add(r.corp_code); return true; })
+      .map(r => ({ corp_code: r.corp_code, corp_name: r.corp_name, stock_code: r.stock_code || '' }));
 
+    searchCache[q] = corps;
+    renderCorpList(corps, q, listEl);
   } catch(e) {
     listEl.innerHTML = `<div class="error-box">❌ ${e.message}</div>`;
     setApiStatus('err');
   }
+}
+
+function renderCorpList(corps, q, listEl) {
+  if (!corps.length) {
+    listEl.innerHTML = '<div class="empty-state" style="padding:16px;font-size:12px">검색 결과가 없습니다.<br><span style="font-size:11px;color:var(--text-dim)">다른 키워드로 시도해보세요.</span></div>';
+    return;
+  }
+  // 상장사 우선
+  const sorted = [...corps].sort((a,b) => (b.stock_code?1:0) - (a.stock_code?1:0));
+  listEl.innerHTML = sorted.slice(0,30).map(c => `
+    <div class="corp-item" onclick="selectCorp('${c.corp_code}','${escHtml(c.corp_name)}','${c.stock_code||''}','')">
+      <span class="corp-name">${highlight(escHtml(c.corp_name), q)}</span>
+      <span class="corp-meta">
+        ${c.stock_code ? '📈 ' + c.stock_code : '비상장'} &nbsp;·&nbsp; ${c.corp_code}
+      </span>
+    </div>
+  `).join('') + (corps.length > 30 ? `<div style="padding:8px 12px;font-size:11px;color:var(--text-dim)">외 ${corps.length-30}개</div>` : '');
 }
 
 // 검색어 하이라이트
