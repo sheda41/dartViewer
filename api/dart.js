@@ -1,91 +1,77 @@
-import zlib from 'zlib';
-import { promisify } from 'util';
+// CommonJS 방식 (Vercel 기본값)
+const https = require('https');
+const zlib = require('zlib');
 
-const inflate = promisify(zlib.inflateRaw);
-
-// ZIP 파일에서 첫 번째 파일 추출 (Node 내장, 의존성 없음)
-async function extractFirstFileFromZip(buffer) {
-  const buf = Buffer.from(buffer);
-  let offset = 0;
-
-  while (offset < buf.length - 4) {
-    const sig = buf.readUInt32LE(offset);
-    if (sig !== 0x04034b50) break; // Local file header signature
-
-    const compression = buf.readUInt16LE(offset + 8);
-    const compressedSize = buf.readUInt32LE(offset + 18);
-    const fileNameLen = buf.readUInt16LE(offset + 26);
-    const extraLen = buf.readUInt16LE(offset + 28);
-    const dataOffset = offset + 30 + fileNameLen + extraLen;
-
-    const compressed = buf.slice(dataOffset, dataOffset + compressedSize);
-
-    if (compression === 0) {
-      return compressed.toString('utf-8');
-    } else if (compression === 8) {
-      const decompressed = await inflate(compressed);
-      return decompressed.toString('utf-8');
-    }
-    offset = dataOffset + compressedSize;
-  }
-  throw new Error('ZIP 파일 파싱 실패');
+function fetchBuffer(urlStr) {
+  return new Promise((resolve, reject) => {
+    https.get(urlStr, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, buffer: Buffer.concat(chunks), headers: res.headers }));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
 }
 
-// XML에서 기업 목록 파싱
+function extractZip(buffer) {
+  let offset = 0;
+  while (offset < buffer.length - 30) {
+    if (buffer[offset]===0x50 && buffer[offset+1]===0x4b && buffer[offset+2]===0x03 && buffer[offset+3]===0x04) {
+      const compression = buffer.readUInt16LE(offset + 8);
+      const compSize    = buffer.readUInt32LE(offset + 18);
+      const fnLen       = buffer.readUInt16LE(offset + 26);
+      const exLen       = buffer.readUInt16LE(offset + 28);
+      const dataStart   = offset + 30 + fnLen + exLen;
+      const compressed  = buffer.slice(dataStart, dataStart + compSize);
+      if (compression === 0) return compressed.toString('utf-8');
+      if (compression === 8) return zlib.inflateRawSync(compressed).toString('utf-8');
+      throw new Error('지원하지 않는 압축: ' + compression);
+    }
+    offset++;
+  }
+  throw new Error('ZIP 헤더 없음');
+}
+
 function parseCorpXml(xml) {
   const corps = [];
-  const regex = /<list>([\s\S]*?)<\/list>/g;
+  const re = /<list>([\s\S]*?)<\/list>/g;
   let m;
-  while ((m = regex.exec(xml)) !== null) {
-    const block = m[1];
-    const get = (tag) => {
-      const r = new RegExp(`<${tag}>([^<]*)<\\/${tag}>`);
-      const match = r.exec(block);
-      return match ? match[1].trim() : '';
-    };
-    const corp_code = get('corp_code');
-    const corp_name = get('corp_name');
-    const stock_code = get('stock_code');
-    if (corp_code) corps.push({ corp_code, corp_name, stock_code });
+  while ((m = re.exec(xml)) !== null) {
+    const b = m[1];
+    const g = (t) => { const r = b.match(new RegExp('<'+t+'>([^<]*)<\/'+t+'>')); return r ? r[1].trim() : ''; };
+    const corp_code = g('corp_code');
+    if (corp_code) corps.push({ corp_code, corp_name: g('corp_name'), stock_code: g('stock_code') });
   }
   return corps;
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
   const { endpoint, ...params } = req.query;
   if (!endpoint) { res.status(400).json({ error: 'endpoint required' }); return; }
 
   const DART_KEY = '6674f9aa0d9358b2693ab0dd6131773721c26a63';
-  const url = new URL('https://opendart.fss.or.kr/api/' + endpoint);
-  url.searchParams.set('crtfc_key', DART_KEY);
-  for (const [k, v] of Object.entries(params)) {
-    if (v) url.searchParams.set(k, v);
-  }
+  const qs = new URLSearchParams({ crtfc_key: DART_KEY });
+  for (const [k, v] of Object.entries(params)) if (v) qs.set(k, v);
+  const dartUrl = 'https://opendart.fss.or.kr/api/' + endpoint + '?' + qs.toString();
 
   try {
-    const dartRes = await fetch(url.toString());
-    if (!dartRes.ok) {
-      res.status(dartRes.status).json({ error: 'DART 오류: ' + dartRes.status });
-      return;
-    }
+    const { status, buffer, headers } = await fetchBuffer(dartUrl);
+    if (status !== 200) { res.status(502).json({ error: 'DART ' + status, url: dartUrl }); return; }
 
-    const contentType = dartRes.headers.get('content-type') || '';
-    const isZip = contentType.includes('zip') || contentType.includes('octet-stream') || endpoint.includes('corpCode');
+    const ct = headers['content-type'] || '';
+    const isZip = ct.includes('zip') || ct.includes('octet') || endpoint.includes('corpCode');
 
     if (isZip) {
-      const arrayBuf = await dartRes.arrayBuffer();
-      const xml = await extractFirstFileFromZip(arrayBuf);
+      const xml  = extractZip(buffer);
       const list = parseCorpXml(xml);
       res.status(200).json({ status: '000', total_count: list.length, list });
     } else {
-      const data = await dartRes.json();
-      res.status(200).json(data);
+      res.status(200).json(JSON.parse(buffer.toString('utf-8')));
     }
-  } catch (e) {
-    res.status(500).json({ error: e.message, stack: e.stack });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
-}
+};
