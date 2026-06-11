@@ -631,15 +631,20 @@ function setApiStatus(s) {
 
 function requireKey() { return true; }
 
-// ── DART API 호출 (Vercel 서버리스 경유) ──
-async function dartGet(endpoint, params) {
+// ── DART API 호출 (Vercel 서버리스 경유, 재시도 2회) ──
+async function dartGet(endpoint, params, retry = 2) {
   const q = new URLSearchParams({ endpoint: endpoint.replace(/^\//, '') });
   for (const [k,v] of Object.entries(params)) if (v) q.set(k, v);
-  const res = await fetch('/api/dart?' + q.toString());
-  if (!res.ok) throw new Error('서버 오류: ' + res.status);
-  const data = await res.json();
-  if (data.status && data.status !== '000') throw new Error(data.message || '조회 실패 (' + data.status + ')');
-  return data;
+  try {
+    const res = await fetch('/api/dart?' + q.toString());
+    if (!res.ok) throw new Error('서버 오류: ' + res.status);
+    const data = await res.json();
+    if (data.status && data.status !== '000') throw new Error(data.message || '조회 실패 (' + data.status + ')');
+    return data;
+  } catch(e) {
+    if (retry > 0) return dartGet(endpoint, params, retry - 1);
+    throw e;
+  }
 }
 
 // ── 기업 검색 캐시 ──
@@ -703,8 +708,16 @@ function renderCorpList(corps, q, listEl) {
     listEl.innerHTML = '<div class="empty-state" style="padding:16px;font-size:12px">검색 결과가 없습니다.<br><span style="font-size:11px;color:var(--text-dim)">다른 키워드로 시도해보세요.</span></div>';
     return;
   }
-  // 상장사 우선
-  const sorted = [...corps].sort((a,b) => (b.stock_code?1:0) - (a.stock_code?1:0));
+  // 완전일치 > 시작일치 > 포함일치 > 상장사 순 정렬
+  const qL = q.toLowerCase();
+  const rank = (c) => {
+    const n = c.corp_name.toLowerCase();
+    if (n === qL) return 0;
+    if (n.startsWith(qL)) return 1;
+    if (c.stock_code) return 2;
+    return 3;
+  };
+  const sorted = [...corps].sort((a,b) => rank(a) - rank(b));
   listEl.innerHTML = sorted.slice(0,30).map(c => `
     <div class="corp-item" onclick="selectCorp('${c.corp_code}','${escHtml(c.corp_name)}','${c.stock_code||''}','')">
       <span class="corp-name">${highlight(escHtml(c.corp_name), q)}</span>
@@ -846,9 +859,10 @@ async function loadFinancial() {
   await fetchFinancial(year);
 }
 
-async function fetchFinancial(year) {
+async function fetchFinancial(year, originalYear) {
+  if (!originalYear) originalYear = year;
   try {
-    let data;
+    let data, fsDiv = 'CFS';
     try {
       data = await dartGet('/fnlttSinglAcntAll.json', {
         corp_code: state.selectedCorp.corpCode,
@@ -857,6 +871,7 @@ async function fetchFinancial(year) {
         fs_div: 'CFS',
       });
     } catch {
+      fsDiv = 'OFS';
       data = await dartGet('/fnlttSinglAcntAll.json', {
         corp_code: state.selectedCorp.corpCode,
         bsns_year: String(year),
@@ -864,11 +879,17 @@ async function fetchFinancial(year) {
         fs_div: 'OFS',
       });
     }
-    state.financialData = data.list || [];
-    renderFinancial(state.financialData, year);
+    // 데이터가 있을 때만 한번에 렌더링 (깜빡임 방지)
+    const list = data.list || [];
+    if (!list.length && year > 2015) {
+      await fetchFinancial(year - 1, originalYear);
+      return;
+    }
+    state.financialData = list;
+    renderFinancial(list, year);
   } catch(e) {
     if (year > 2015) {
-      await fetchFinancial(year - 1);
+      await fetchFinancial(year - 1, originalYear);
     } else {
       showError('재무제표 조회 실패: ' + e.message);
     }
