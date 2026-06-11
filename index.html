@@ -610,6 +610,8 @@ const state = {
   currentTab: 'overview',
   disclosures: [],
   financialData: null,
+  // 렌더링 캐시 (탭 전환 시 재사용)
+  cache: { overview: null, disclosures: null, financial: null },
 };
 
 // ── Init ──
@@ -683,8 +685,11 @@ async function searchCorp() {
         });
         (data.list || []).forEach(r => {
           if (!seen.has(r.corp_code)) {
-            seen.add(r.corp_code);
-            corps.push({ corp_code: r.corp_code, corp_name: r.corp_name, stock_code: r.stock_code || '' });
+            // corp_name에 검색어가 실제로 포함된 회사만 추가
+            if (r.corp_name && r.corp_name.toLowerCase().includes(q.toLowerCase())) {
+              seen.add(r.corp_code);
+              corps.push({ corp_code: r.corp_code, corp_name: r.corp_name, stock_code: r.stock_code || '' });
+            }
           }
         });
       } catch(e) {
@@ -743,6 +748,7 @@ async function selectCorp(corpCode, corpName, stockCode, jurirNo) {
   state.selectedCorp = { corpCode, corpName, stockCode, jurirNo };
   state.disclosures = [];
   state.financialData = null;
+  state.cache = { overview: null, disclosures: null, financial: null };
 
   document.querySelectorAll('.corp-item').forEach(el => el.classList.remove('active'));
   event.currentTarget.classList.add('active');
@@ -792,7 +798,7 @@ function renderOverview(c) {
       <button class="btn btn-ghost" onclick="loadFinancial()">📊 재무제표 조회</button>
       ${c.hm_url ? `<a href="${escHtml(c.hm_url)}" target="_blank" class="btn btn-ghost" style="display:inline-flex;align-items:center">🌐 홈페이지</a>` : ''}
     </div>
-  `);
+  `, 'overview');
 }
 
 // ── Disclosures ──
@@ -818,7 +824,7 @@ async function searchDisclosures() {
 
 function renderDisclosures(list) {
   if (!list.length) {
-    setContent('<div class="empty-state">해당 기간에 공시 내역이 없습니다.</div>');
+    setContent('<div class="empty-state">해당 기간에 공시 내역이 없습니다.</div>', 'disclosures');
     return;
   }
   setContent(`
@@ -843,7 +849,7 @@ function renderDisclosures(list) {
         </div>
       `).join('')}
     </div>
-  `);
+  `, 'disclosures');
 }
 
 function openDisclosure(rceptNo) {
@@ -898,7 +904,7 @@ async function fetchFinancial(year, originalYear) {
 
 function renderFinancial(list, year) {
   if (!list.length) {
-    setContent('<div class="empty-state">재무제표 데이터가 없습니다.</div>');
+    setContent('<div class="empty-state">재무제표 데이터가 없습니다.</div>', 'financial');
     return;
   }
   const bs  = list.filter(r => r.sj_div === 'BS');
@@ -930,7 +936,7 @@ function renderFinancial(list, year) {
     ${renderFinTable('재무상태표 (Balance Sheet)', bs, year)}
     ${renderFinTable('손익계산서 (Income Statement)', is_, year)}
     ${cf.length ? renderFinTable('현금흐름표 (Cash Flow)', cf, year) : ''}
-  `);
+  `, 'financial');
 }
 
 function renderFinTable(title, rows, year) {
@@ -1022,11 +1028,20 @@ function switchTab(tab) {
   state.currentTab = tab;
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'financial' && state.selectedCorp && !state.financialData) loadFinancial();
-  else if (tab === 'disclosures' && state.selectedCorp && !state.disclosures.length) searchDisclosures();
-  else if (tab === 'overview' && state.selectedCorp) loadCorpInfo(state.selectedCorp.corpCode);
+
+  // 캐시된 화면 즉시 표시
+  if (state.cache[tab]) { setContent(state.cache[tab]); return; }
+
+  // 캐시 없으면 API 호출
+  if (!state.selectedCorp) return;
+  if (tab === 'financial') loadFinancial();
+  else if (tab === 'disclosures') searchDisclosures();
+  else if (tab === 'overview') loadCorpInfo(state.selectedCorp.corpCode);
 }
-function setContent(html) { document.getElementById('mainContent').innerHTML = html; }
+function setContent(html, cacheTab) {
+  document.getElementById('mainContent').innerHTML = html;
+  if (cacheTab) state.cache[cacheTab] = html;
+}
 function showLoading() { setContent('<div class="loading"><div class="spinner"></div> 데이터 조회 중…</div>'); }
 function showError(msg) { setContent(`<div class="error-box">❌ ${escHtml(msg)}</div>`); }
 function showToast(msg) {
