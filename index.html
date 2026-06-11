@@ -626,40 +626,13 @@ function setApiStatus(s) {
 
 function requireKey() { return true; }
 
-// ── DART API 호출 (다중 프록시) ──
-const PROXIES = [
-  { name: "corsproxy.io",   make: u => `https://corsproxy.io/?${encodeURIComponent(u)}` },
-  { name: "allorigins",     make: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
-  { name: "cors.sh",        make: u => `https://proxy.cors.sh/${u}` },
-  { name: "crossorigin.me", make: u => `https://crossorigin.me/${u}` },
-  { name: "htmldriven",     make: u => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(u)}` },
-];
-
-async function dartFetch(url) {
-  const errors = [];
-  for (const proxy of PROXIES) {
-    try {
-      const res = await fetch(proxy.make(url));
-      if (!res.ok) { errors.push(`${proxy.name}: HTTP ${res.status}`); continue; }
-      const buf = await res.arrayBuffer();
-      if (!buf.byteLength) { errors.push(`${proxy.name}: 빈 응답`); continue; }
-      console.log(`성공: ${proxy.name}`);
-      return buf;
-    } catch(e) {
-      errors.push(`${proxy.name}: ${e.message}`);
-    }
-  }
-  throw new Error("모든 프록시 실패\n" + errors.join("\n"));
-}
-
+// ── DART API 호출 (Vercel 서버리스 경유) ──
 async function dartGet(endpoint, params) {
-  const url = new URL(DART_BASE + endpoint);
-  url.searchParams.set('crtfc_key', state.apiKey);
-  for (const [k,v] of Object.entries(params)) if (v) url.searchParams.set(k, v);
-
-  const buf = await dartFetch(url.toString());
-  const text = new TextDecoder('utf-8').decode(buf);
-  const data = JSON.parse(text);
+  const q = new URLSearchParams({ endpoint: endpoint.replace(/^\//, '') });
+  for (const [k,v] of Object.entries(params)) if (v) q.set(k, v);
+  const res = await fetch('/api/dart?' + q.toString());
+  if (!res.ok) throw new Error('서버 오류: ' + res.status);
+  const data = await res.json();
   if (data.status && data.status !== '000') throw new Error(data.message || '조회 실패 (' + data.status + ')');
   return data;
 }
@@ -670,8 +643,9 @@ let corpListCache = null;
 async function loadCorpList() {
   if (corpListCache) return corpListCache;
 
-  const zipUrl = `https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key=${state.apiKey}`;
-  const buf = await dartFetch(zipUrl);
+  const res = await fetch('/api/dart?endpoint=corpCode.xml');
+  if (!res.ok) throw new Error('기업 목록 로드 실패: ' + res.status);
+  const buf = await res.arrayBuffer();
 
   // JSZip으로 압축 해제
   const JSZip = await loadJSZip();
