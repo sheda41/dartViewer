@@ -1,15 +1,15 @@
 const https = require('https');
 
-function fetchJson(urlStr) {
+function fetchRaw(urlStr) {
   return new Promise((resolve, reject) => {
     https.get(urlStr, (res) => {
       const chunks = [];
       res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, data: JSON.parse(Buffer.concat(chunks).toString('utf-8')) });
-        } catch(e) { reject(new Error('JSON 파싱 실패: ' + e.message)); }
-      });
+      res.on('end', () => resolve({
+        status: res.statusCode,
+        headers: res.headers,
+        body: Buffer.concat(chunks).toString('utf-8')
+      }));
       res.on('error', reject);
     }).on('error', reject);
   });
@@ -28,10 +28,28 @@ module.exports = async function handler(req, res) {
   const dartUrl = 'https://opendart.fss.or.kr/api/' + endpoint + '?' + qs.toString();
 
   try {
-    const { status, data } = await fetchJson(dartUrl);
-    if (status !== 200) { res.status(502).json({ error: 'DART ' + status }); return; }
-    res.status(200).json(data);
+    const { status, headers, body } = await fetchRaw(dartUrl);
+
+    // 진단용: 상태/헤더/본문 앞부분 노출
+    if (status !== 200) {
+      res.status(502).json({ error: 'DART HTTP ' + status, dartUrl, body: body.slice(0, 500) });
+      return;
+    }
+
+    // JSON 파싱 시도
+    try {
+      const data = JSON.parse(body);
+      res.status(200).json(data);
+    } catch(e) {
+      // 파싱 실패 시 원문 노출 (진단용)
+      res.status(500).json({
+        error: 'JSON 파싱 실패',
+        contentType: headers['content-type'],
+        bodyPreview: body.slice(0, 500),
+        dartUrl
+      });
+    }
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message, dartUrl });
   }
 };
