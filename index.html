@@ -628,22 +628,28 @@ function requireKey() { return true; }
 
 // ── DART API 호출 (다중 프록시) ──
 const PROXIES = [
-  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://proxy.cors.sh/${u}`,
+  { name: "corsproxy.io",   make: u => `https://corsproxy.io/?${encodeURIComponent(u)}` },
+  { name: "allorigins",     make: u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}` },
+  { name: "cors.sh",        make: u => `https://proxy.cors.sh/${u}` },
+  { name: "crossorigin.me", make: u => `https://crossorigin.me/${u}` },
+  { name: "htmldriven",     make: u => `https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(u)}` },
 ];
 
 async function dartFetch(url) {
-  for (const make of PROXIES) {
+  const errors = [];
+  for (const proxy of PROXIES) {
     try {
-      const res = await fetch(make(url));
-      if (!res.ok) continue;
+      const res = await fetch(proxy.make(url));
+      if (!res.ok) { errors.push(`${proxy.name}: HTTP ${res.status}`); continue; }
       const buf = await res.arrayBuffer();
-      if (!buf.byteLength) continue;
+      if (!buf.byteLength) { errors.push(`${proxy.name}: 빈 응답`); continue; }
+      console.log(`성공: ${proxy.name}`);
       return buf;
-    } catch {}
+    } catch(e) {
+      errors.push(`${proxy.name}: ${e.message}`);
+    }
   }
-  throw new Error('네트워크 연결 실패 — 모든 프록시 차단됨');
+  throw new Error("모든 프록시 실패\n" + errors.join("\n"));
 }
 
 async function dartGet(endpoint, params) {
