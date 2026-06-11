@@ -652,11 +652,15 @@ async function searchCorp() {
     // 캐시 확인
     if (searchCache[q]) { renderCorpList(searchCache[q], q, listEl); return; }
 
-    // 최근 5년 공시에서 corp_name 포함 검색 → 회사 목록 추출
-    const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    // 최근 29개월 공시에서 corp_name 포함 검색 (DART는 30개월 제한)
+    const now = new Date();
+    const today = now.toISOString().slice(0,10).replace(/-/g,'');
+    const past = new Date(now); past.setMonth(past.getMonth() - 29);
+    const bgnDate = past.toISOString().slice(0,10).replace(/-/g,'');
+
     const data = await dartGet('/list.json', {
       corp_name: q,
-      bgn_de: '20200101',
+      bgn_de: bgnDate,
       end_de: today,
       page_count: '100',
     });
