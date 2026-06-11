@@ -3,11 +3,21 @@ const https = require('https');
 function fetchJson(urlStr, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 5) { reject(new Error('리다이렉트 초과')); return; }
-    https.get(urlStr, (res) => {
-      // 302/301 리다이렉트 처리
-      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303) && res.headers.location) {
-        const next = res.headers.location.startsWith('http') ? res.headers.location : 'https://opendart.fss.or.kr' + res.headers.location;
-        resolve(fetchJson(next, redirectCount + 1));
+
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      }
+    };
+
+    https.get(urlStr, options, (res) => {
+      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303 || res.statusCode === 307) && res.headers.location) {
+        let loc = res.headers.location;
+        if (!loc.startsWith('http')) loc = 'https://opendart.fss.or.kr' + loc;
+        // 동일 URL로 무한 리다이렉트 방지
+        if (loc === urlStr) { reject(new Error('동일 URL 리다이렉트 루프')); return; }
+        resolve(fetchJson(loc, redirectCount + 1));
         return;
       }
       const chunks = [];
@@ -15,7 +25,7 @@ function fetchJson(urlStr, redirectCount = 0) {
       res.on('end', () => {
         const body = Buffer.concat(chunks).toString('utf-8');
         try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
-        catch(e) { reject(new Error('JSON 파싱 실패: ' + body.slice(0, 200))); }
+        catch(e) { reject(new Error('파싱실패 [' + res.statusCode + ']: ' + body.slice(0, 200))); }
       });
       res.on('error', reject);
     }).on('error', reject);
