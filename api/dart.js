@@ -1,15 +1,22 @@
 const https = require('https');
 
-function fetchRaw(urlStr) {
+function fetchJson(urlStr, redirectCount = 0) {
   return new Promise((resolve, reject) => {
+    if (redirectCount > 5) { reject(new Error('리다이렉트 초과')); return; }
     https.get(urlStr, (res) => {
+      // 302/301 리다이렉트 처리
+      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 303) && res.headers.location) {
+        const next = res.headers.location.startsWith('http') ? res.headers.location : 'https://opendart.fss.or.kr' + res.headers.location;
+        resolve(fetchJson(next, redirectCount + 1));
+        return;
+      }
       const chunks = [];
       res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({
-        status: res.statusCode,
-        headers: res.headers,
-        body: Buffer.concat(chunks).toString('utf-8')
-      }));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf-8');
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch(e) { reject(new Error('JSON 파싱 실패: ' + body.slice(0, 200))); }
+      });
       res.on('error', reject);
     }).on('error', reject);
   });
@@ -28,28 +35,13 @@ module.exports = async function handler(req, res) {
   const dartUrl = 'https://opendart.fss.or.kr/api/' + endpoint + '?' + qs.toString();
 
   try {
-    const { status, headers, body } = await fetchRaw(dartUrl);
-
-    // 진단용: 상태/헤더/본문 앞부분 노출
-    if (status !== 200) {
-      res.status(502).json({ error: 'DART HTTP ' + status, dartUrl, body: body.slice(0, 500) });
+    const { data } = await fetchJson(dartUrl);
+    if (data.status && data.status !== '000') {
+      res.status(400).json({ error: data.message || '조회 실패', dart_status: data.status });
       return;
     }
-
-    // JSON 파싱 시도
-    try {
-      const data = JSON.parse(body);
-      res.status(200).json(data);
-    } catch(e) {
-      // 파싱 실패 시 원문 노출 (진단용)
-      res.status(500).json({
-        error: 'JSON 파싱 실패',
-        contentType: headers['content-type'],
-        bodyPreview: body.slice(0, 500),
-        dartUrl
-      });
-    }
+    res.status(200).json(data);
   } catch(e) {
-    res.status(500).json({ error: e.message, dartUrl });
+    res.status(500).json({ error: e.message });
   }
 };
