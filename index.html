@@ -286,38 +286,36 @@ async function loadData() {
   const year = parseInt(document.getElementById('yearInput').value);
   if (!year || year < 2010 || year > 2030) { alert('올바른 연도를 입력해주세요.'); return; }
   state.year = year;
+  state.cache = { overview: null, financial: null };
   showLoading();
 
   try {
-    // CFS 우선, 없으면 OFS
-    let data, fsDiv = 'CFS';
+    // 기준연도 재무제표 (CFS 우선)
+    let baseData, fsDiv = 'CFS';
     try {
-      data = await dartGet('/fnlttSinglAcntAll.json', {
-        corp_code: state.selectedCorp.corpCode,
-        bsns_year: String(year),
-        reprt_code: '11011',
-        fs_div: 'CFS',
-      });
-      if (!data.list || !data.list.length) throw new Error('데이터 없음');
+      baseData = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'CFS' });
+      if (!baseData.list || !baseData.list.length) throw new Error('no data');
     } catch {
       fsDiv = 'OFS';
-      data = await dartGet('/fnlttSinglAcntAll.json', {
-        corp_code: state.selectedCorp.corpCode,
-        bsns_year: String(year),
-        reprt_code: '11011',
-        fs_div: 'OFS',
-      });
+      baseData = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'OFS' });
     }
 
-    // 회사 기본정보도 함께
+    // 5개년 병렬 로딩 (기준연도 포함 과거 4년)
+    const years = [year-4, year-3, year-2, year-1, year];
+    const multiYearData = await Promise.all(years.map(async y => {
+      if (y === year) return { year: y, list: baseData.list || [] };
+      try {
+        const d = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(y), reprt_code: '11011', fs_div: fsDiv });
+        return { year: y, list: d.list || [] };
+      } catch { return { year: y, list: [] }; }
+    }));
+
+    // 회사 기본정보
     let corpInfo = {};
-    try {
-      corpInfo = await dartGet('/company.json', { corp_code: state.selectedCorp.corpCode });
-    } catch {}
+    try { corpInfo = await dartGet('/company.json', { corp_code: state.selectedCorp.corpCode }); } catch {}
 
-    state.financialData = { list: data.list || [], fsDiv, corpInfo };
+    state.financialData = { list: baseData.list || [], fsDiv, corpInfo, multiYear: multiYearData };
 
-    // 현재 탭 렌더링
     if (state.currentTab === 'overview') renderOverview();
     else renderFinancial();
   } catch(e) {
@@ -325,52 +323,25 @@ async function loadData() {
   }
 }
 
-// ── 단위 처리 ──
-function getUnit(list) {
-  // DART API: 주로 원 단위지만 unit 필드 있으면 활용
-  const sample = list[0];
-  if (sample && sample.currency) return sample.currency;
-  return '원';
-}
-
-function parseNum(s) {
-  if (!s) return null;
-  const n = parseInt(String(s).replace(/,/g,'').trim());
-  return isNaN(n) ? null : n;
-}
-
-// 원 단위 → 백만원 변환 (DART는 원 단위로 제공)
-function toM(s) {
-  const n = parseNum(s);
-  if (n === null) return null;
-  return Math.round(n / 1000000);
-}
-
-function fmtM(s) {
-  const n = toM(s);
-  if (n === null) return '-';
-  return n.toLocaleString('ko-KR');
-}
-
-function fmtBig(s) {
-  const n = toM(s);
-  if (n === null) return '-';
-  const abs = Math.abs(n);
-  if (abs >= 1000000) return (n/1000000).toFixed(1) + '조';
-  if (abs >= 10000) return Math.round(n/10000) + '억';
-  return n.toLocaleString() + '백만';
+// 5개년 데이터에서 특정 계정 값 추출
+function getMultiYear(multiYear, ...kws) {
+  return multiYear.map(({ year, list }) => {
+    const is_ = list.filter(r => r.sj_div === 'IS');
+    const bs  = list.filter(r => r.sj_div === 'BS');
+    const all = [...is_, ...bs];
+    const row = all.find(r => r.account_nm && kws.some(k => r.account_nm.includes(k)));
+    return { year, val: row ? toM(row.thstrm_amount) : null };
+  });
 }
 
 // ── 기업 재무정보 탭 ──
 function renderOverview() {
-  const { list, fsDiv, corpInfo } = state.financialData;
+  const { list, fsDiv, corpInfo, multiYear } = state.financialData;
   const year = state.year;
   const corp = state.selectedCorp;
 
   const bs  = list.filter(r => r.sj_div === 'BS');
   const is_ = list.filter(r => r.sj_div === 'IS');
-  const cf  = list.filter(r => r.sj_div === 'CF');
-
   const find = (arr, ...kws) => arr.find(r => r.account_nm && kws.some(k => r.account_nm.includes(k)));
 
   const revenue    = find(is_, '매출액', '수익(매출액)', '영업수익');
@@ -382,17 +353,56 @@ function renderOverview() {
 
   const cur  = k => toM(k?.thstrm_amount);
   const prev = k => toM(k?.frmtrm_amount);
+  const calcR = (a, b) => (a !== null && b && b !== 0) ? (a / Math.abs(b) * 100) : null;
 
-  // 비율 계산
-  const calcRatio = (a, b) => (a !== null && b && b !== 0) ? (a / Math.abs(b) * 100) : null;
-  const fmt1 = v => v !== null ? v.toFixed(1) + '%' : '-';
-
-  const roa = calcRatio(cur(netIncome), cur(totalAsset));
-  const roe = calcRatio(cur(netIncome), cur(equity));
-  const opMargin = calcRatio(cur(opIncome), cur(revenue));
-  const netMargin = calcRatio(cur(netIncome), cur(revenue));
-  const debtRatio = calcRatio(cur(totalDebt), cur(equity));
+  const roa = calcR(cur(netIncome), cur(totalAsset));
+  const roe = calcR(cur(netIncome), cur(equity));
+  const opMargin  = calcR(cur(opIncome), cur(revenue));
+  const netMargin = calcR(cur(netIncome), cur(revenue));
+  const debtRatio = calcR(cur(totalDebt), cur(equity));
   const yoy = (c, p) => (c !== null && p !== null && p !== 0) ? ((c-p)/Math.abs(p)*100).toFixed(1) : null;
+
+  // 5개년 시계열
+  const myRev = getMultiYear(multiYear, '매출액', '수익(매출액)', '영업수익');
+  const myOp  = getMultiYear(multiYear, '영업이익');
+  const myNet = getMultiYear(multiYear, '당기순이익');
+  const myAsset = getMultiYear(multiYear, '자산총계');
+  const myEquity= getMultiYear(multiYear, '자본총계');
+  const myInv   = getMultiYear(multiYear, '재고자산');
+  const myInvAllw = getMultiYear(multiYear, '재고자산평가충당금', '평가충당금');
+
+  const labels5 = multiYear.map(d => d.year + '년');
+  const vals = arr => arr.map(d => d.val);
+
+  // 수익성 5개년
+  const myOpMargin  = multiYear.map(({ year: y, list: l }) => {
+    const is = l.filter(r => r.sj_div === 'IS');
+    const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => r.account_nm.includes(k)));
+    const op  = is.find(r => r.account_nm && r.account_nm.includes('영업이익'));
+    const rv = toM(rev?.thstrm_amount), ov = toM(op?.thstrm_amount);
+    return (rv && rv !== 0) ? parseFloat((ov/rv*100).toFixed(2)) : null;
+  });
+  const myNetMargin = multiYear.map(({ year: y, list: l }) => {
+    const is = l.filter(r => r.sj_div === 'IS');
+    const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => r.account_nm.includes(k)));
+    const net = is.find(r => r.account_nm && r.account_nm.includes('당기순이익'));
+    const rv = toM(rev?.thstrm_amount), nv = toM(net?.thstrm_amount);
+    return (rv && rv !== 0) ? parseFloat((nv/rv*100).toFixed(2)) : null;
+  });
+  const myROA = multiYear.map(({ list: l }) => {
+    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS');
+    const asset = bs.find(r => r.account_nm?.includes('자산총계'));
+    const net   = is.find(r => r.account_nm?.includes('당기순이익'));
+    const av = toM(asset?.thstrm_amount), nv = toM(net?.thstrm_amount);
+    return (av && av !== 0) ? parseFloat((nv/av*100).toFixed(2)) : null;
+  });
+  const myROE = multiYear.map(({ list: l }) => {
+    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS');
+    const eq  = bs.find(r => r.account_nm?.includes('자본총계'));
+    const net = is.find(r => r.account_nm?.includes('당기순이익'));
+    const ev = toM(eq?.thstrm_amount), nv = toM(net?.thstrm_amount);
+    return (ev && ev !== 0) ? parseFloat((nv/ev*100).toFixed(2)) : null;
+  });
 
   const html = `
     <div class="corp-header">
@@ -411,100 +421,200 @@ function renderOverview() {
       </div>
     </div>
 
-    <!-- KPI -->
     <div class="kpi-grid">
-      ${kpiCard('매출액', fmtBig(revenue?.thstrm_amount), yoy(cur(revenue), prev(revenue)))}
-      ${kpiCard('영업이익', fmtBig(opIncome?.thstrm_amount), yoy(cur(opIncome), prev(opIncome)))}
-      ${kpiCard('당기순이익', fmtBig(netIncome?.thstrm_amount), yoy(cur(netIncome), prev(netIncome)))}
-      ${kpiCard('총자산', fmtBig(totalAsset?.thstrm_amount), null)}
-      ${kpiCard('자본총계', fmtBig(equity?.thstrm_amount), null)}
-      ${kpiCard('부채총계', fmtBig(totalDebt?.thstrm_amount), null)}
+      ${kpiCard('매출액',     fmtBig(revenue?.thstrm_amount),    yoy(cur(revenue),    prev(revenue)))}
+      ${kpiCard('영업이익',   fmtBig(opIncome?.thstrm_amount),   yoy(cur(opIncome),   prev(opIncome)))}
+      ${kpiCard('당기순이익', fmtBig(netIncome?.thstrm_amount),  yoy(cur(netIncome),  prev(netIncome)))}
+      ${kpiCard('총자산',     fmtBig(totalAsset?.thstrm_amount), null)}
+      ${kpiCard('자본총계',   fmtBig(equity?.thstrm_amount),     null)}
+      ${kpiCard('부채총계',   fmtBig(totalDebt?.thstrm_amount),  null)}
     </div>
 
-    <!-- 수익성 지표 -->
     <div class="kpi-grid">
-      ${ratioCard('ROA', roa, '총자산순이익률')}
-      ${ratioCard('ROE', roe, '자기자본이익률')}
-      ${ratioCard('영업이익률', opMargin, 'Operating Margin')}
-      ${ratioCard('순이익률', netMargin, 'Net Margin')}
-      ${ratioCard('부채비율', debtRatio, 'Debt Ratio')}
+      ${ratioCard('ROA',      roa,       '총자산순이익률')}
+      ${ratioCard('ROE',      roe,       '자기자본이익률')}
+      ${ratioCard('영업이익률', opMargin,  'Operating Margin')}
+      ${ratioCard('순이익률',  netMargin, 'Net Margin')}
+      ${ratioCard('부채비율',  debtRatio, 'Debt Ratio')}
     </div>
 
-    <!-- 차트 -->
     <div class="chart-grid">
       <div class="chart-card">
-        <div class="chart-title">매출액 · 영업이익 비교 (당기 vs 전기)</div>
-        <div class="chart-wrap"><canvas id="chartRevOp"></canvas></div>
+        <div class="chart-title">📊 매출액 · 영업이익 · 당기순이익 추이 (${year-4}~${year})</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartRevOp"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">수익성 지표 (%)</div>
-        <div class="chart-wrap"><canvas id="chartRatio"></canvas></div>
+        <div class="chart-title">📈 영업이익률 · 순이익률 추이 (%)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartMargin"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">자산 구조 (당기)</div>
-        <div class="chart-wrap"><canvas id="chartAsset"></canvas></div>
+        <div class="chart-title">📈 ROA · ROE 추이 (%)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartROAROE"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">당기순이익 비교 (당기 vs 전기)</div>
-        <div class="chart-wrap"><canvas id="chartNet"></canvas></div>
+        <div class="chart-title">📦 재고자산 · 평가충당금 추이</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="chartInv"></canvas></div>
       </div>
     </div>
   `;
 
   setContent(html, 'overview');
 
-  // 차트 렌더링
   setTimeout(() => {
-    const chartOpts = {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#8892aa', font: { size: 11 } } } },
-      scales: { x: { ticks: { color: '#8892aa', font: { size: 10 } }, grid: { color: '#2a3050' } }, y: { ticks: { color: '#8892aa', font: { size: 10 } }, grid: { color: '#2a3050' } } }
+    // 공통 옵션
+    const gridColor = 'rgba(42,48,80,0.8)';
+    const tickColor = '#8892aa';
+    const baseScales = {
+      x: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
+      y: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } }
     };
+    const legendOpts = { labels: { color: tickColor, font: { size: 11 }, boxWidth: 12 } };
 
-    // 매출액 · 영업이익
+    // ── 차트1: 매출액(막대) + 영업이익·당기순이익(면적 꺾은선) ──
     new Chart(document.getElementById('chartRevOp'), {
-      type: 'bar',
       data: {
-        labels: ['매출액', '영업이익'],
+        labels: labels5,
         datasets: [
-          { label: `${year}년`, data: [cur(revenue), cur(opIncome)], backgroundColor: 'rgba(79,142,247,0.7)', borderRadius: 4 },
-          { label: `${year-1}년`, data: [prev(revenue), prev(opIncome)], backgroundColor: 'rgba(79,142,247,0.25)', borderRadius: 4 },
+          {
+            type: 'bar', label: '매출액',
+            data: vals(myRev),
+            backgroundColor: 'rgba(79,142,247,0.5)',
+            borderColor: 'rgba(79,142,247,0.8)',
+            borderWidth: 1, borderRadius: 4,
+            yAxisID: 'y',
+          },
+          {
+            type: 'line', label: '영업이익',
+            data: vals(myOp),
+            borderColor: 'rgba(52,201,138,1)',
+            backgroundColor: 'rgba(52,201,138,0.15)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(52,201,138,1)', pointRadius: 4,
+            yAxisID: 'y',
+          },
+          {
+            type: 'line', label: '당기순이익',
+            data: vals(myNet),
+            borderColor: 'rgba(245,200,66,1)',
+            backgroundColor: 'rgba(245,200,66,0.1)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(245,200,66,1)', pointRadius: 4,
+            yAxisID: 'y',
+          },
         ]
       },
-      options: { ...chartOpts, plugins: { ...chartOpts.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw||0).toLocaleString() + '백만원' } } } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: legendOpts,
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw||0).toLocaleString() + '백만원' } }
+        },
+        scales: { ...baseScales }
+      }
     });
 
-    // 수익성 지표
-    new Chart(document.getElementById('chartRatio'), {
+    // ── 차트2: 영업이익률·순이익률 (면적 꺾은선) ──
+    new Chart(document.getElementById('chartMargin'), {
+      type: 'line',
+      data: {
+        labels: labels5,
+        datasets: [
+          {
+            label: '영업이익률',
+            data: myOpMargin,
+            borderColor: 'rgba(79,142,247,1)',
+            backgroundColor: 'rgba(79,142,247,0.15)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(79,142,247,1)', pointRadius: 4,
+          },
+          {
+            label: '순이익률',
+            data: myNetMargin,
+            borderColor: 'rgba(124,92,191,1)',
+            backgroundColor: 'rgba(124,92,191,0.15)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(124,92,191,1)', pointRadius: 4,
+          },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: legendOpts,
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw||0).toFixed(1) + '%' } }
+        },
+        scales: { ...baseScales, y: { ...baseScales.y, ticks: { ...baseScales.y.ticks, callback: v => v + '%' } } }
+      }
+    });
+
+    // ── 차트3: ROA·ROE (면적 꺾은선) ──
+    new Chart(document.getElementById('chartROAROE'), {
+      type: 'line',
+      data: {
+        labels: labels5,
+        datasets: [
+          {
+            label: 'ROA',
+            data: myROA,
+            borderColor: 'rgba(52,201,138,1)',
+            backgroundColor: 'rgba(52,201,138,0.15)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(52,201,138,1)', pointRadius: 4,
+          },
+          {
+            label: 'ROE',
+            data: myROE,
+            borderColor: 'rgba(240,90,106,1)',
+            backgroundColor: 'rgba(240,90,106,0.12)',
+            fill: true, tension: 0.3,
+            pointBackgroundColor: 'rgba(240,90,106,1)', pointRadius: 4,
+          },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: legendOpts,
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw||0).toFixed(1) + '%' } }
+        },
+        scales: { ...baseScales, y: { ...baseScales.y, ticks: { ...baseScales.y.ticks, callback: v => v + '%' } } }
+      }
+    });
+
+    // ── 차트4: 재고자산·평가충당금 (그룹 막대) ──
+    new Chart(document.getElementById('chartInv'), {
       type: 'bar',
       data: {
-        labels: ['ROA', 'ROE', '영업이익률', '순이익률'],
-        datasets: [{ label: `${year}년 (%)`, data: [roa, roe, opMargin, netMargin].map(v => v ? parseFloat(v.toFixed(2)) : 0), backgroundColor: ['rgba(52,201,138,0.7)', 'rgba(79,142,247,0.7)', 'rgba(124,92,191,0.7)', 'rgba(245,200,66,0.7)'], borderRadius: 4 }]
+        labels: labels5,
+        datasets: [
+          {
+            label: '재고자산',
+            data: vals(myInv),
+            backgroundColor: 'rgba(79,142,247,0.65)',
+            borderColor: 'rgba(79,142,247,0.9)',
+            borderWidth: 1, borderRadius: 3,
+          },
+          {
+            label: '평가충당금',
+            data: vals(myInvAllw),
+            backgroundColor: 'rgba(240,90,106,0.65)',
+            borderColor: 'rgba(240,90,106,0.9)',
+            borderWidth: 1, borderRadius: 3,
+          },
+        ]
       },
-      options: { ...chartOpts, plugins: { legend: { display: false } } }
-    });
-
-    // 자산 구조 (도넛)
-    const assetV = cur(totalAsset) || 0;
-    const debtV  = cur(totalDebt)  || 0;
-    const equityV= cur(equity)     || 0;
-    new Chart(document.getElementById('chartAsset'), {
-      type: 'doughnut',
-      data: {
-        labels: ['자본', '부채'],
-        datasets: [{ data: [equityV, debtV], backgroundColor: ['rgba(52,201,138,0.8)', 'rgba(240,90,106,0.8)'], borderWidth: 0 }]
-      },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8892aa', font: { size: 11 } } } } }
-    });
-
-    // 당기순이익
-    new Chart(document.getElementById('chartNet'), {
-      type: 'bar',
-      data: {
-        labels: [`${year}년`, `${year-1}년`],
-        datasets: [{ label: '당기순이익', data: [cur(netIncome), prev(netIncome)], backgroundColor: [cur(netIncome) >= 0 ? 'rgba(52,201,138,0.7)' : 'rgba(240,90,106,0.7)', 'rgba(79,142,247,0.3)'], borderRadius: 4 }]
-      },
-      options: { ...chartOpts, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.raw||0).toLocaleString() + '백만원' } } } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: legendOpts,
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw||0).toLocaleString() + '백만원' } }
+        },
+        scales: { ...baseScales }
+      }
     });
   }, 50);
 }
@@ -515,20 +625,13 @@ function kpiCard(label, value, yoyPct) {
     const color = parseFloat(yoyPct) >= 0 ? 'var(--green)' : 'var(--red)';
     change = `<div class="kpi-change" style="color:${color}">${parseFloat(yoyPct)>=0?'▲':'▼'} ${Math.abs(yoyPct)}% YoY</div>`;
   }
-  return `<div class="kpi-card">
-    <div class="kpi-label">${label}</div>
-    <div class="kpi-value">${value}</div>
-    ${change}
-  </div>`;
+  return `<div class="kpi-card"><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${change}</div>`;
 }
 
 function ratioCard(label, value, sub) {
   const v = value !== null ? value.toFixed(1) : '-';
   const color = value === null ? 'var(--text)' : value >= 0 ? 'var(--green)' : 'var(--red)';
-  return `<div class="kpi-card">
-    <div class="kpi-label">${label} <span style="color:var(--text-dim);font-size:10px">${sub}</span></div>
-    <div class="kpi-value" style="color:${color}">${v}<span class="kpi-unit">%</span></div>
-  </div>`;
+  return `<div class="kpi-card"><div class="kpi-label">${label} <span style="color:var(--text-dim);font-size:10px">${sub}</span></div><div class="kpi-value" style="color:${color}">${v}<span class="kpi-unit">%</span></div></div>`;
 }
 
 // ── 상세 재무정보 탭 ──
