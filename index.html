@@ -649,16 +649,14 @@ async function dartGet(endpoint, params, retry = 2) {
   }
 }
 
-// ── 기업 목록 캐시 ──
+// ── 기업 목록 캐시 (정적 JSON) ──
 let corpListCache = null;
 
 async function loadCorpList() {
   if (corpListCache) return corpListCache;
-  const res = await fetch('/api/dart?endpoint=corpCode.xml');
+  const res = await fetch('/corps.json');
   if (!res.ok) throw new Error('기업 목록 로드 실패: ' + res.status);
-  const data = await res.json();
-  if (!data.list) throw new Error('형식 오류');
-  corpListCache = data.list;
+  corpListCache = await res.json();
   return corpListCache;
 }
 
