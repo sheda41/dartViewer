@@ -1,0 +1,48 @@
+name: Update Corps JSON
+
+on:
+  workflow_dispatch:  # 수동 실행
+  schedule:
+    - cron: '0 0 1 */3 *'  # 3개월마다 자동 실행
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate corps.json
+        run: |
+          python3 << 'PYEOF'
+          import requests, zipfile, io, re, json
+
+          KEY = '6674f9aa0d9358b2693ab0dd6131773721c26a63'
+          url = f'https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key={KEY}'
+
+          r = requests.get(url, timeout=60)
+          z = zipfile.ZipFile(io.BytesIO(r.content))
+          xml = z.read('CORPCODE.xml').decode('utf-8')
+
+          corps = []
+          for m in re.finditer(r'<list>([\s\S]*?)</list>', xml):
+              b = m.group(1)
+              def g(t):
+                  r2 = re.search(f'<{t}>([^<]*)</{t}>', b)
+                  return r2.group(1).strip() if r2 else ''
+              code = g('corp_code')
+              if code:
+                  corps.append({'corp_code': code, 'corp_name': g('corp_name'), 'stock_code': g('stock_code')})
+
+          with open('corps.json', 'w', encoding='utf-8') as f:
+              json.dump(corps, f, ensure_ascii=False)
+
+          print(f'완료: {len(corps)}개 기업')
+          PYEOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add corps.json
+          git diff --staged --quiet || git commit -m "Update corps.json"
+          git push
