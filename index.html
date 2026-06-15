@@ -360,7 +360,7 @@ async function loadData() {
 // 5개년 데이터에서 특정 계정 값 추출
 function getMultiYear(multiYear, ...kws) {
   return multiYear.map(({ year, list }) => {
-    const is_ = list.filter(r => r.sj_div === 'IS');
+    const is_ = list.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const bs  = list.filter(r => r.sj_div === 'BS');
     const all = [...is_, ...bs];
     const row = all.find(r => r.account_nm && kws.some(k => r.account_nm.includes(k)));
@@ -375,7 +375,7 @@ function renderOverview() {
   const corp = state.selectedCorp;
 
   const bs  = list.filter(r => r.sj_div === 'BS');
-  const is_ = list.filter(r => r.sj_div === 'IS');
+  const is_ = list.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
   const find = (arr, ...kws) => arr.find(r => r.account_nm && kws.some(k => r.account_nm.includes(k)));
 
   const revenue    = find(is_, '매출액', '수익(매출액)', '영업수익');
@@ -410,28 +410,28 @@ function renderOverview() {
 
   // 수익성 5개년
   const myOpMargin  = multiYear.map(({ year: y, list: l }) => {
-    const is = l.filter(r => r.sj_div === 'IS');
+    const is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => r.account_nm.includes(k)));
     const op  = is.find(r => r.account_nm && r.account_nm.includes('영업이익'));
     const rv = toM(rev?.thstrm_amount), ov = toM(op?.thstrm_amount);
     return (rv && rv !== 0) ? parseFloat((ov/rv*100).toFixed(2)) : null;
   });
   const myNetMargin = multiYear.map(({ year: y, list: l }) => {
-    const is = l.filter(r => r.sj_div === 'IS');
+    const is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => r.account_nm.includes(k)));
     const net = is.find(r => r.account_nm && r.account_nm.includes('당기순이익'));
     const rv = toM(rev?.thstrm_amount), nv = toM(net?.thstrm_amount);
     return (rv && rv !== 0) ? parseFloat((nv/rv*100).toFixed(2)) : null;
   });
   const myROA = multiYear.map(({ list: l }) => {
-    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS');
+    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const asset = bs.find(r => r.account_nm?.includes('자산총계'));
     const net   = is.find(r => r.account_nm?.includes('당기순이익'));
     const av = toM(asset?.thstrm_amount), nv = toM(net?.thstrm_amount);
     return (av && av !== 0) ? parseFloat((nv/av*100).toFixed(2)) : null;
   });
   const myROE = multiYear.map(({ list: l }) => {
-    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS');
+    const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const eq  = bs.find(r => r.account_nm?.includes('자본총계'));
     const net = is.find(r => r.account_nm?.includes('당기순이익'));
     const ev = toM(eq?.thstrm_amount), nv = toM(net?.thstrm_amount);
@@ -643,7 +643,7 @@ function renderFinancial() {
   const year = state.year;
 
   const bs  = list.filter(r => r.sj_div === 'BS');
-  const is_ = list.filter(r => r.sj_div === 'IS');
+  const is_ = list.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
   const cf  = list.filter(r => r.sj_div === 'CF');
 
   const html = `
