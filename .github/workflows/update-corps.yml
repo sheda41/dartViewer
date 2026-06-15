@@ -1,9 +1,9 @@
 name: Update Corps JSON
 
 on:
-  workflow_dispatch:  # 수동 실행
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 1 */3 *'  # 3개월마다 자동 실행
+    - cron: '0 0 1 */3 *'
 
 jobs:
   update:
@@ -11,32 +11,67 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Generate corps.json
+      - name: Generate corps.json (상장사만, corp_cls 포함)
         run: |
           python3 << 'PYEOF'
-          import requests, zipfile, io, re, json
+          import requests, zipfile, io, re, json, time
 
           KEY = '6674f9aa0d9358b2693ab0dd6131773721c26a63'
-          url = f'https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key={KEY}'
 
-          r = requests.get(url, timeout=60)
+          # 1. 전체 기업 목록 다운로드
+          print("기업 목록 다운로드 중...")
+          r = requests.get(f'https://opendart.fss.or.kr/api/corpCode.xml?crtfc_key={KEY}', timeout=60)
           z = zipfile.ZipFile(io.BytesIO(r.content))
           xml = z.read('CORPCODE.xml').decode('utf-8')
 
-          corps = []
+          # 2. stock_code 있는 회사만 추출 (상장사 후보)
+          candidates = []
           for m in re.finditer(r'<list>([\s\S]*?)</list>', xml):
               b = m.group(1)
               def g(t):
                   r2 = re.search(f'<{t}>([^<]*)</{t}>', b)
                   return r2.group(1).strip() if r2 else ''
               code = g('corp_code')
-              if code:
-                  corps.append({'corp_code': code, 'corp_name': g('corp_name'), 'stock_code': g('stock_code')})
+              stock = g('stock_code')
+              name = g('corp_name')
+              if code and stock:  # stock_code 있는 것만
+                  candidates.append({'corp_code': code, 'corp_name': name, 'stock_code': stock})
+
+          print(f"stock_code 있는 기업: {len(candidates)}개")
+
+          # 3. company.json으로 corp_cls 확인 (Y/K/N만 유지)
+          corps = []
+          valid_cls = {'Y', 'K', 'N'}  # 유가증권, 코스닥, 코넥스
+          
+          for i, c in enumerate(candidates):
+              try:
+                  res = requests.get(
+                      f'https://opendart.fss.or.kr/api/company.json',
+                      params={'crtfc_key': KEY, 'corp_code': c['corp_code']},
+                      timeout=10
+                  )
+                  data = res.json()
+                  cls = data.get('corp_cls', '')
+                  if cls in valid_cls:
+                      corps.append({
+                          'corp_code': c['corp_code'],
+                          'corp_name': c['corp_name'],
+                          'stock_code': c['stock_code'],
+                          'corp_cls': cls
+                      })
+                  if (i+1) % 100 == 0:
+                      print(f"진행: {i+1}/{len(candidates)}, 유효: {len(corps)}개")
+                  time.sleep(0.05)  # API 과부하 방지
+              except Exception as e:
+                  print(f"오류 {c['corp_code']}: {e}")
+                  continue
+
+          print(f"\n최종 상장사: {len(corps)}개")
 
           with open('corps.json', 'w', encoding='utf-8') as f:
               json.dump(corps, f, ensure_ascii=False)
 
-          print(f'완료: {len(corps)}개 기업')
+          print("corps.json 저장 완료")
           PYEOF
 
       - name: Commit and push
@@ -44,5 +79,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add corps.json
-          git diff --staged --quiet || git commit -m "Update corps.json"
+          git diff --staged --quiet || git commit -m "Update corps.json (상장사만, corp_cls 포함)"
           git push
