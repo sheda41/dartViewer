@@ -302,6 +302,18 @@ function fmtBig(s) {
   return n.toLocaleString() + '백만';
 }
 
+// 연도별 재무데이터 로딩 (CFS 우선, 실패시 OFS)
+async function fetchYear(corpCode, year) {
+  try {
+    const d = await dartGet('/fnlttSinglAcntAll.json', { corp_code: corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'CFS' });
+    if (d.list && d.list.length) return { year, list: d.list, fsDiv: 'CFS' };
+  } catch {}
+  try {
+    const d = await dartGet('/fnlttSinglAcntAll.json', { corp_code: corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'OFS' });
+    return { year, list: d.list || [], fsDiv: 'OFS' };
+  } catch { return { year, list: [], fsDiv: 'OFS' }; }
+}
+
 async function loadData() {
   const year = parseInt(document.getElementById('yearInput').value);
   if (!year || year < 2010 || year > 2030) { alert('올바른 연도를 입력해주세요.'); return; }
@@ -310,31 +322,24 @@ async function loadData() {
   showLoading();
 
   try {
-    // 기준연도 재무제표 (CFS 우선)
-    let baseData, fsDiv = 'CFS';
-    try {
-      baseData = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'CFS' });
-      if (!baseData.list || !baseData.list.length) throw new Error('no data');
-    } catch {
-      fsDiv = 'OFS';
-      baseData = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(year), reprt_code: '11011', fs_div: 'OFS' });
-    }
-
-    // 5개년 병렬 로딩 (기준연도 포함 과거 4년)
+    const corpCode = state.selectedCorp.corpCode;
     const years = [year-4, year-3, year-2, year-1, year];
-    const multiYearData = await Promise.all(years.map(async y => {
-      if (y === year) return { year: y, list: baseData.list || [] };
-      try {
-        const d = await dartGet('/fnlttSinglAcntAll.json', { corp_code: state.selectedCorp.corpCode, bsns_year: String(y), reprt_code: '11011', fs_div: fsDiv });
-        return { year: y, list: d.list || [] };
-      } catch { return { year: y, list: [] }; }
-    }));
 
-    // 회사 기본정보
-    let corpInfo = {};
-    try { corpInfo = await dartGet('/company.json', { corp_code: state.selectedCorp.corpCode }); } catch {}
+    // 5개년 재무데이터 + 회사정보 전부 동시 병렬 호출
+    const [corpInfo, ...multiYearData] = await Promise.all([
+      dartGet('/company.json', { corp_code: corpCode }).catch(() => ({})),
+      ...years.map(y => fetchYear(corpCode, y))
+    ]);
 
-    state.financialData = { list: baseData.list || [], fsDiv, corpInfo, multiYear: multiYearData };
+    const baseYear = multiYearData.find(d => d.year === year);
+    const fsDiv = baseYear?.fsDiv || 'CFS';
+
+    state.financialData = {
+      list: baseYear?.list || [],
+      fsDiv,
+      corpInfo,
+      multiYear: multiYearData,
+    };
 
     if (state.currentTab === 'overview') renderOverview();
     else renderFinancial();
