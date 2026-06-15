@@ -252,7 +252,16 @@ async function searchCorp() {
     );
     if (!matched.length) { listEl.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--text-dim)">검색 결과 없음</div>'; return; }
     matched.sort((a,b) => {
-      const r = c => { const n = c.corp_name.toLowerCase(); if (n===qL) return 0; if (n.startsWith(qL)) return 1; if (c.stock_code) return 2; return 3; };
+      const r = c => {
+        const n = c.corp_name.toLowerCase();
+        const hasStock = !!c.stock_code;
+        if (n === qL && hasStock) return 0;   // 완전일치 + 상장사
+        if (n === qL)            return 1;   // 완전일치 + 비상장
+        if (n.startsWith(qL) && hasStock) return 2;  // 시작일치 + 상장사
+        if (n.startsWith(qL))   return 3;   // 시작일치 + 비상장
+        if (hasStock)            return 4;   // 포함일치 + 상장사
+        return 5;                            // 포함일치 + 비상장
+      };
       return r(a) - r(b);
     });
     listEl.innerHTML = matched.slice(0,50).map(c => `
