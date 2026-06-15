@@ -246,12 +246,15 @@ async function searchCorp() {
   try {
     const all = await loadCorpList();
     const qL = q.toLowerCase();
-    const matched = all.filter(c =>
-      c.stock_code && (
+    // corp_cls 있으면 Y/K/N만, 없으면 stock_code 있는 것만 (기존 corps.json 호환)
+    const matched = all.filter(c => {
+      if (c.corp_cls) return ['Y','K','N'].includes(c.corp_cls) &&
+        (c.corp_name && c.corp_name.toLowerCase().includes(qL) || c.stock_code.includes(q));
+      return c.stock_code && (
         (c.corp_name && c.corp_name.toLowerCase().includes(qL)) ||
         c.stock_code.includes(q)
-      )
-    );
+      );
+    });
     if (!matched.length) { listEl.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--text-dim)">검색 결과 없음</div>'; return; }
     matched.sort((a,b) => {
       const r = c => {
