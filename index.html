@@ -247,8 +247,10 @@ async function searchCorp() {
     const all = await loadCorpList();
     const qL = q.toLowerCase();
     const matched = all.filter(c =>
-      (c.corp_name && c.corp_name.toLowerCase().includes(qL)) ||
-      (c.stock_code && c.stock_code.includes(q))
+      c.stock_code && (
+        (c.corp_name && c.corp_name.toLowerCase().includes(qL)) ||
+        c.stock_code.includes(q)
+      )
     );
     if (!matched.length) { listEl.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--text-dim)">검색 결과 없음</div>'; return; }
     matched.sort((a,b) => {
