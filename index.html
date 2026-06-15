@@ -386,12 +386,12 @@ function renderOverview() {
   const norm = s => s.replace(/\s/g, '');
   const find = (arr, ...kws) => arr.find(r => r.account_nm && kws.some(k => norm(r.account_nm).includes(norm(k))));
 
-  const revenue    = find(is_, '매출액', '수익(매출액)', '영업수익');
+  const revenue    = find(is_, '매출액', '매출', '수익(매출액)', '영업수익');
   const opIncome   = find(is_, '영업이익');
   const netIncome  = find(is_, '당기순이익');
-  const totalAsset = find(bs, '자산총계');
-  const equity     = find(bs, '자본총계');
-  const totalDebt  = find(bs, '부채총계');
+  const totalAsset = find(bs, '자산총계', '자산계', '자산 총계', '자산 계');
+  const equity     = find(bs, '자본총계', '자본계', '자본 총계', '자본 계');
+  const totalDebt  = find(bs, '부채총계', '부채계', '부채 총계', '부채 계');
 
   const cur  = k => toM(k?.thstrm_amount);
   const prev = k => toM(k?.frmtrm_amount);
@@ -405,11 +405,11 @@ function renderOverview() {
   const yoy = (c, p) => (c !== null && p !== null && p !== 0) ? ((c-p)/Math.abs(p)*100).toFixed(1) : null;
 
   // 5개년 시계열
-  const myRev = getMultiYear(multiYear, '매출액', '수익(매출액)', '영업수익');
+  const myRev = getMultiYear(multiYear, '매출액', '매출', '수익(매출액)', '영업수익');
   const myOp  = getMultiYear(multiYear, '영업이익');
   const myNet = getMultiYear(multiYear, '당기순이익');
-  const myAsset = getMultiYear(multiYear, '자산총계');
-  const myEquity= getMultiYear(multiYear, '자본총계');
+  const myAsset = getMultiYear(multiYear, '자산총계', '자산계', '자산 총계', '자산 계');
+  const myEquity= getMultiYear(multiYear, '자본총계', '자본계', '자본 총계', '자본 계');
   const myInv   = getMultiYear(multiYear, '재고자산');
   const myInvAllw = getMultiYear(multiYear, '재고자산평가충당금', '평가충당금');
 
@@ -420,7 +420,7 @@ function renderOverview() {
   const myOpMargin  = multiYear.map(({ year: y, list: l }) => {
     const is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const nrm = s => s.replace(/\s/g, '');
-    const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => nrm(r.account_nm).includes(nrm(k))));
+    const rev = is.find(r => r.account_nm && ['매출액','매출','수익(매출액)','영업수익'].some(k => nrm(r.account_nm).includes(nrm(k))));
     const op  = is.find(r => r.account_nm && nrm(r.account_nm).includes('영업이익'));
     const rv = toM(rev?.thstrm_amount), ov = toM(op?.thstrm_amount);
     return (rv && rv !== 0) ? parseFloat((ov/rv*100).toFixed(2)) : null;
@@ -428,7 +428,7 @@ function renderOverview() {
   const myNetMargin = multiYear.map(({ year: y, list: l }) => {
     const is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const nrm2 = s => s.replace(/\s/g, '');
-    const rev = is.find(r => r.account_nm && ['매출액','수익(매출액)','영업수익'].some(k => nrm2(r.account_nm).includes(nrm2(k))));
+    const rev = is.find(r => r.account_nm && ['매출액','매출','수익(매출액)','영업수익'].some(k => nrm2(r.account_nm).includes(nrm2(k))));
     const net = is.find(r => r.account_nm && nrm2(r.account_nm).includes('당기순이익'));
     const rv = toM(rev?.thstrm_amount), nv = toM(net?.thstrm_amount);
     return (rv && rv !== 0) ? parseFloat((nv/rv*100).toFixed(2)) : null;
@@ -436,7 +436,7 @@ function renderOverview() {
   const myROA = multiYear.map(({ list: l }) => {
     const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const n1 = s => s.replace(/\s/g, '');
-    const asset = bs.find(r => r.account_nm && n1(r.account_nm).includes('자산총계'));
+    const asset = bs.find(r => r.account_nm && ['자산총계','자산계'].some(k => n1(r.account_nm).includes(n1(k))));
     const net   = is.find(r => r.account_nm && n1(r.account_nm).includes('당기순이익'));
     const av = toM(asset?.thstrm_amount), nv = toM(net?.thstrm_amount);
     return (av && av !== 0) ? parseFloat((nv/av*100).toFixed(2)) : null;
@@ -444,7 +444,7 @@ function renderOverview() {
   const myROE = multiYear.map(({ list: l }) => {
     const bs = l.filter(r => r.sj_div === 'BS'), is = l.filter(r => r.sj_div === 'IS' || r.sj_div === 'CIS');
     const n2 = s => s.replace(/\s/g, '');
-    const eq  = bs.find(r => r.account_nm && n2(r.account_nm).includes('자본총계'));
+    const eq  = bs.find(r => r.account_nm && ['자본총계','자본계'].some(k => n2(r.account_nm).includes(n2(k))));
     const net = is.find(r => r.account_nm && n2(r.account_nm).includes('당기순이익'));
     const ev = toM(eq?.thstrm_amount), nv = toM(net?.thstrm_amount);
     return (ev && ev !== 0) ? parseFloat((nv/ev*100).toFixed(2)) : null;
