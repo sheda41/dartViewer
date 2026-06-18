@@ -757,10 +757,15 @@ function switchTab(tab) {
   state.currentTab = tab;
   document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  if (state.cache[tab]) { document.getElementById('mainContent').innerHTML = state.cache[tab]; redrawCharts(); return; }
+  if (state.cache[tab]) {
+    document.getElementById('mainContent').innerHTML = state.cache[tab];
+    if (tab === 'overview') redrawCharts();
+    return;
+  }
+  if (tab === 'news') { loadNews(); return; }
   if (!state.financialData) return;
   if (tab === 'overview') renderOverview();
-  else renderFinancial();
+  else if (tab === 'financial') renderFinancial();
 }
 
 function redrawCharts() {
