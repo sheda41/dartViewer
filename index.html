@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DART 재무정보 조회</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -173,7 +174,31 @@
     color: var(--text-dim);
     display: flex;
     gap: 10px;
+    align-items: center;
   }
+  .news-card-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .news-card-body { flex: 1; min-width: 0; }
+  .news-word-btn {
+    flex-shrink: 0;
+    background: rgba(79,142,247,0.12);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 6px;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 10px;
+    text-align: center;
+    transition: background 0.15s;
+    white-space: nowrap;
+    font-family: 'Noto Sans KR', sans-serif;
+    line-height: 1.4;
+  }
+  .news-word-btn:hover { background: rgba(79,142,247,0.22); }
   .news-source {
     color: var(--accent);
     font-weight: 500;
@@ -242,6 +267,7 @@ const state = {
   financialData: null,
   year: null,
   cache: { overview: null, financial: null, news: null },
+  newsItems: [],
 };
 
 window.onload = () => {
@@ -802,26 +828,114 @@ async function loadNews() {
         <button class="btn" style="font-size:11px;padding:5px 12px" onclick="loadNews()">🔄 새로고침</button>
       </div>
       <div class="news-list">
-        ${items.map(item => {
+        ${items.map((item, idx) => {
           const title = item.title.replace(/<[^>]+>/g, '');
           const desc  = item.description.replace(/<[^>]+>/g, '');
           const date  = item.pubDate ? new Date(item.pubDate).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }) : '';
+          const link  = item.originallink || item.link;
           return `
-            <a class="news-card" href="${escHtml(item.originallink || item.link)}" target="_blank">
-              <div class="news-title">${escHtml(title)}</div>
-              <div class="news-desc">${escHtml(desc)}</div>
-              <div class="news-meta">
-                <span class="news-source">📰 네이버 뉴스</span>
-                <span>${date}</span>
+            <div class="news-card">
+              <div class="news-card-inner">
+                <div class="news-card-body">
+                  <a href="${escHtml(link)}" target="_blank" style="text-decoration:none">
+                    <div class="news-title">${escHtml(title)}</div>
+                  </a>
+                  <div class="news-desc">${escHtml(desc)}</div>
+                  <div class="news-meta">
+                    <span class="news-source">📰 네이버 뉴스</span>
+                    <span>${date}</span>
+                  </div>
+                </div>
+                <button class="news-word-btn" onclick="downloadNewsDocx(${idx})" title="Word로 저장">
+                  📄 Word<br>저장
+                </button>
               </div>
-            </a>`;
+            </div>`;
         }).join('')}
       </div>`;
 
+    state.newsItems = items;
     setContent(html, 'news');
   } catch(e) {
     setContent(`<div class="error-box">❌ ${escHtml(e.message)}</div>`);
   }
+}
+
+// ── 뉴스 Word 다운로드 ──
+async function downloadNewsDocx(idx) {
+  const item = state.newsItems[idx];
+  if (!item) return;
+
+  const title = item.title.replace(/<[^>]+>/g, '');
+  const desc  = item.description.replace(/<[^>]+>/g, '');
+  const date  = item.pubDate ? new Date(item.pubDate).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }) : '';
+  const link  = item.originallink || item.link;
+  const corp  = state.selectedCorp?.corpName || '';
+
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle } = docx;
+
+  const doc = new Document({
+    styles: {
+      default: { document: { run: { font: '맑은 고딕', size: 22 } } },
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 },
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+        }
+      },
+      children: [
+        // 회사명 + 날짜 헤더
+        new Paragraph({
+          children: [
+            new TextRun({ text: corp + ' 뉴스 요약', bold: true, size: 28, color: '3B6FD4', font: '맑은 고딕' }),
+          ],
+          spacing: { after: 120 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: date, size: 18, color: '888888', font: '맑은 고딕' })],
+          spacing: { after: 320 },
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D0D8EA', space: 1 } },
+        }),
+        // 기사 제목
+        new Paragraph({
+          children: [new TextRun({ text: '제목', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
+          spacing: { before: 240, after: 80 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: title, bold: true, size: 24, font: '맑은 고딕' })],
+          spacing: { after: 320 },
+        }),
+        // 요약
+        new Paragraph({
+          children: [new TextRun({ text: '요약', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
+          spacing: { before: 80, after: 80 },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: desc, size: 22, font: '맑은 고딕' })],
+          spacing: { after: 320, line: 360 },
+        }),
+        // 원문 링크
+        new Paragraph({
+          children: [new TextRun({ text: '원문 링크', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
+          spacing: { before: 80, after: 80 },
+          border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'D0D8EA', space: 1 } },
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: link, size: 18, color: '3B6FD4', font: '맑은 고딕' })],
+        }),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${corp}_뉴스_${date || idx+1}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Helpers ──
