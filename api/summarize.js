@@ -8,13 +8,12 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
-  // body 파싱
   const body = req.body || {};
   const { title = '', description = '', corp = '', date = '', link = '' } = body;
-
   if (!title) { res.status(400).json({ error: 'title required' }); return; }
 
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  if (!ANTHROPIC_KEY) { res.status(500).json({ error: 'API key not set' }); return; }
 
   const prompt = `다음 뉴스를 JSON으로 요약하세요.
 회사: ${corp}, 제목: ${title}, 내용: ${description}
@@ -48,18 +47,26 @@ terms는 영어약어/전문용어만, 없으면 빈배열.`;
         let data = '';
         res2.on('data', chunk => { data += chunk; });
         res2.on('end', () => {
-          try { resolve(JSON.parse(data)); }
-          catch(e) { reject(new Error('파싱실패: ' + data.slice(0, 200))); }
+          try { resolve({ status: res2.statusCode, body: JSON.parse(data) }); }
+          catch(e) { reject(new Error('파싱실패: ' + data.slice(0, 300))); }
         });
       });
-      req2.on('error', reject);
+      req2.on('error', e => reject(new Error('연결실패: ' + e.message)));
       req2.write(payload);
       req2.end();
     });
 
-    if (result.error) throw new Error(JSON.stringify(result.error));
+    // 상태코드와 함께 로그
+    if (result.status !== 200) {
+      res.status(500).json({ 
+        error: 'Anthropic 오류', 
+        status: result.status,
+        detail: result.body 
+      });
+      return;
+    }
 
-    const text = result.content?.[0]?.text || '';
+    const text = result.body.content?.[0]?.text || '';
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('JSON없음: ' + text.slice(0, 200));
 
