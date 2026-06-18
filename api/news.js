@@ -1,0 +1,38 @@
+const https = require('https');
+
+function fetchJson(urlStr, headers) {
+  return new Promise((resolve, reject) => {
+    https.get(urlStr, { headers }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8'))); }
+        catch(e) { reject(new Error('파싱 실패')); }
+      });
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+
+  const { query } = req.query;
+  if (!query) { res.status(400).json({ error: 'query required' }); return; }
+
+  const CLIENT_ID     = 'P0_j6iyVF0OyP9hEHKeg';
+  const CLIENT_SECRET = 'N7LtaY_qTL';
+
+  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=15&sort=date`;
+
+  try {
+    const data = await fetchJson(url, {
+      'X-Naver-Client-Id':     CLIENT_ID,
+      'X-Naver-Client-Secret': CLIENT_SECRET,
+    });
+    res.status(200).json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+};
