@@ -861,81 +861,153 @@ async function loadNews() {
   }
 }
 
-// ── 뉴스 Word 다운로드 ──
+// ── 뉴스 Word 다운로드 (양식 기반 + AI 요약) ──
 async function downloadNewsDocx(idx) {
   const item = state.newsItems[idx];
   if (!item) return;
 
   const title = item.title.replace(/<[^>]+>/g, '');
   const desc  = item.description.replace(/<[^>]+>/g, '');
-  const date  = item.pubDate ? new Date(item.pubDate).toLocaleDateString('ko-KR', { year:'numeric', month:'long', day:'numeric' }) : '';
   const link  = item.originallink || item.link;
   const corp  = state.selectedCorp?.corpName || '';
+  const now   = new Date(item.pubDate || Date.now());
+  const days  = ['일','월','화','수','목','금','토'];
+  const dateStr = `${String(now.getFullYear()).slice(2)}. ${now.getMonth()+1}. ${now.getDate()}(${days[now.getDay()]})`;
 
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle } = window.docx || docx;
+  // 버튼 로딩 표시
+  const btn = document.querySelectorAll('.news-word-btn')[idx];
+  if (btn) { btn.textContent = '생성 중…'; btn.disabled = true; }
 
-  const doc = new Document({
-    styles: {
-      default: { document: { run: { font: '맑은 고딕', size: 22 } } },
-    },
-    sections: [{
-      properties: {
-        page: {
-          size: { width: 11906, height: 16838 },
-          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
-        }
-      },
+  try {
+    // 1. AI로 보고서 내용 생성
+    const res = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description: desc, corp, date: dateStr, link }),
+    });
+    if (!res.ok) throw new Error('AI 요약 실패: ' + res.status);
+    const summary = await res.json();
+    if (summary.error) throw new Error(summary.error);
+
+    // 2. docx 생성 (사내 양식)
+    const { Document, Packer, Paragraph, TextRun, AlignmentType } = window.docx || docx;
+    const commonP = { autoSpaceDN: false, autoSpaceDE: false };
+    const font = '맑은 고딕';
+    const children = [];
+
+    // 전체 제목 (중앙, 굵게, 밑줄)
+    children.push(new Paragraph({
+      ...commonP,
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 180, line: 360, lineRule: 'auto' },
       children: [
-        // 회사명 + 날짜 헤더
-        new Paragraph({
-          children: [
-            new TextRun({ text: corp + ' 뉴스 요약', bold: true, size: 28, color: '3B6FD4', font: '맑은 고딕' }),
-          ],
-          spacing: { after: 120 },
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: date, size: 18, color: '888888', font: '맑은 고딕' })],
-          spacing: { after: 320 },
-          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'D0D8EA', space: 1 } },
-        }),
-        // 기사 제목
-        new Paragraph({
-          children: [new TextRun({ text: '제목', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
-          spacing: { before: 240, after: 80 },
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: title, bold: true, size: 24, font: '맑은 고딕' })],
-          spacing: { after: 320 },
-        }),
-        // 요약
-        new Paragraph({
-          children: [new TextRun({ text: '요약', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
-          spacing: { before: 80, after: 80 },
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: desc, size: 22, font: '맑은 고딕' })],
-          spacing: { after: 320, line: 360 },
-        }),
-        // 원문 링크
-        new Paragraph({
-          children: [new TextRun({ text: '원문 링크', bold: true, size: 18, color: '888888', font: '맑은 고딕' })],
-          spacing: { before: 80, after: 80 },
-          border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'D0D8EA', space: 1 } },
-        }),
-        new Paragraph({
-          children: [new TextRun({ text: link, size: 18, color: '3B6FD4', font: '맑은 고딕' })],
-        }),
+        new TextRun({ text: corp + ' 뉴스 보고서', bold: true, underline: { type: 'single' }, size: 40, font }),
       ],
-    }],
-  });
+    }));
 
-  const blob = await Packer.toBlob(doc);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${corp}_뉴스_${date || idx+1}.docx`;
-  a.click();
-  URL.revokeObjectURL(url);
+    // 날짜 (우측)
+    children.push(new Paragraph({
+      ...commonP,
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 180, line: 360, lineRule: 'auto' },
+      children: [new TextRun({ text: "'" + dateStr, size: 26, font })],
+    }));
+
+    // □ 기사 제목
+    children.push(new Paragraph({
+      ...commonP,
+      spacing: { after: 120, line: 360, lineRule: 'auto' },
+      children: [
+        new TextRun({ text: '□ ', bold: true, size: 26, font }),
+        new TextRun({ text: title, bold: true, size: 26, font }),
+      ],
+    }));
+
+    // - 핵심 내용
+    children.push(new Paragraph({
+      ...commonP,
+      spacing: { after: 60, line: 360, lineRule: 'auto' },
+      indent: { left: 701, hanging: 701 },
+      children: [new TextRun({ text: '- ' + (summary.main_content || desc), size: 24, font })],
+    }));
+
+    // → 시사점
+    if (summary.implications) {
+      children.push(new Paragraph({
+        ...commonP,
+        spacing: { after: 180, line: 360, lineRule: 'auto' },
+        children: [new TextRun({ text: '   → ' + summary.implications, size: 24, font })],
+      }));
+    }
+
+    // □ 용어 설명 (부연설명)
+    if (summary.terms && summary.terms.length > 0) {
+      children.push(new Paragraph({
+        ...commonP,
+        spacing: { before: 120, after: 120, line: 360, lineRule: 'auto' },
+        children: [
+          new TextRun({ text: '□ ', bold: true, size: 26, font }),
+          new TextRun({ text: '주요 용어', bold: true, size: 26, font }),
+        ],
+      }));
+      summary.terms.forEach(t => {
+        children.push(new Paragraph({
+          ...commonP,
+          spacing: { after: 60, line: 360, lineRule: 'auto' },
+          indent: { left: 701, hanging: 701 },
+          children: [
+            new TextRun({ text: '- ', size: 24, font }),
+            new TextRun({ text: t.term, bold: true, size: 24, font }),
+            new TextRun({ text: ': ' + t.explanation, size: 24, font }),
+          ],
+        }));
+      });
+    }
+
+    // → 원문 링크
+    children.push(new Paragraph({
+      ...commonP,
+      spacing: { before: 120, after: 180, line: 360, lineRule: 'auto' },
+      children: [
+        new TextRun({ text: '   → 원문: ', size: 22, font, color: '444444' }),
+        new TextRun({ text: link, size: 22, font, color: '0563C1', underline: { type: 'single' } }),
+      ],
+    }));
+
+    // - 이 상 -
+    children.push(new Paragraph({
+      ...commonP,
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 0, line: 360, lineRule: 'auto' },
+      children: [new TextRun({ text: '- 이 상 -', size: 24, font })],
+    }));
+
+    const doc = new Document({
+      styles: { default: { document: { run: { font, size: 24 } } } },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 },
+            margin: { top: 851, right: 851, bottom: 1134, left: 851 },
+          }
+        },
+        children,
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${corp}_뉴스보고서_${dateStr.replace(/\./g,'').replace(/\s/g,'')}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch(e) {
+    alert('Word 생성 실패: ' + e.message);
+  } finally {
+    if (btn) { btn.innerHTML = '📄 Word<br>저장'; btn.disabled = false; }
+  }
 }
 
 // ── Helpers ──
