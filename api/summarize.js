@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
 
   if (!title) { res.status(400).json({ error: 'title required' }); return; }
 
-  const ANTHROPIC_KEY = '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';
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 
   const prompt = `다음 뉴스를 JSON으로 요약하세요.
 회사: ${corp}, 제목: ${title}, 내용: ${description}
