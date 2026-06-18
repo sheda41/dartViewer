@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
   const { title = '', description = '', corp = '', date = '', link = '' } = body;
   if (!title) { res.status(400).json({ error: 'title required' }); return; }
 
-  const ANTHROPIC_KEY = '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';
+  const ANTHROPIC_KEY = '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';
   if (!ANTHROPIC_KEY) { res.status(500).json({ error: 'API key not set' }); return; }
 
   const prompt = `다음 뉴스를 JSON으로 요약하세요.
