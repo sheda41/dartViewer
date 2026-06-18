@@ -1,3 +1,12 @@
+if (req.method === 'GET') {
+  res.status(200).json({ 
+    key_exists: !!process.env.ANTHROPIC_API_KEY,
+    key_preview: process.env.ANTHROPIC_API_KEY?.slice(0,10) || 'none',
+    all_env: Object.keys(process.env).filter(k => k.includes('ANTHROPIC'))
+  });
+  return;
+}
+
 const https = require('https');
 
 module.exports = async function handler(req, res) {
